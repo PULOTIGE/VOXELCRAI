@@ -1,8 +1,8 @@
 use crate::voxel::types::F16;
-use bytemuck::Zeroable;
+use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy)]
 pub struct LightPattern {
     pub direct_light: F16,
     pub indirect_light: F16,
@@ -16,6 +16,15 @@ pub struct LightPattern {
 }
 
 const _: [u8; 1000] = [0; std::mem::size_of::<LightPattern>()];
+
+unsafe impl Zeroable for LightPattern {}
+unsafe impl Pod for LightPattern {}
+
+impl LightPattern {
+    fn zeroed() -> Self {
+        unsafe { std::mem::zeroed() }
+    }
+}
 
 pub struct LightPatternBank {
     patterns: Vec<LightPattern>,

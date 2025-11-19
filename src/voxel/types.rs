@@ -115,16 +115,16 @@ const _: [u8; 9 * 1024] = [0; std::mem::size_of::<Voxel9k>()];
 
 fn f32_to_f16_bits(value: f32) -> u16 {
     let bits = value.to_bits();
-    let sign = (bits >> 16) & 0x8000;
+    let sign = ((bits >> 16) & 0x8000) as u16;
     let mut exp = ((bits >> 23) & 0xff) as i32;
-    let mut mant = bits & 0x7fffff;
+    let mant = bits & 0x7fffff;
 
     if exp == 0xff {
-        if mant != 0 {
-            return sign | 0x7e00;
+        return if mant != 0 {
+            sign | 0x7e00
         } else {
-            return sign | 0x7c00;
-        }
+            sign | 0x7c00
+        };
     }
 
     exp -= 127;
@@ -132,15 +132,21 @@ fn f32_to_f16_bits(value: f32) -> u16 {
         return sign | 0x7c00;
     }
     if exp < -14 {
-        let shift = -14 - exp;
-        mant |= 1 << 23;
-        mant >>= shift + 1;
-        return sign | ((mant + 0x1000) >> 13) as u16;
+        if exp < -24 {
+            return sign;
+        }
+        let mut mantissa = mant | 0x800000;
+        let shift = (-14 - exp) as u32;
+        let mut half = mantissa >> (shift + 13);
+        if ((mantissa >> (shift + 12)) & 1) != 0 {
+            half += 1;
+        }
+        return sign | (half as u16);
     }
 
     exp += 15;
-    let half = sign | ((exp as u16) << 10) | ((mant + 0x1000) >> 13) as u16;
-    half
+    let half_mant = ((mant + 0x1000) >> 13) as u16;
+    sign | ((exp as u16) << 10) | half_mant
 }
 
 fn f16_bits_to_f32(bits: u16) -> f32 {

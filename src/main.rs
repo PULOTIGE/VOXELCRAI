@@ -9,16 +9,17 @@ use consciousness::core::{ConsciousnessCore, ConsciousnessPulse};
 use glam::{Mat4, Vec3};
 use lighting::pattern_lighting::LightPatternBank;
 use log::{error, info};
+use std::sync::Arc;
 use std::time::Instant;
 use voxel::memory::{EmotionSample, VoxelMemory};
 use wgpu::util::DeviceExt;
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, Event, WindowEvent};
 use winit::event_loop::EventLoop;
-use winit::keyboard::Key;
-use winit::window::Window;
+use winit::keyboard::{Key, NamedKey};
+use winit::window::{Window, WindowAttributes};
 
-const GRID_DIM: u32 = 256;
+const GRID_DIM: u32 = 96;
 const INSTANCE_COUNT: u32 = GRID_DIM * GRID_DIM * GRID_DIM;
 
 fn main() -> Result<()> {
@@ -28,15 +29,18 @@ fn main() -> Result<()> {
 
 async fn run() -> Result<()> {
     let event_loop = EventLoop::new()?;
-    let window = WindowBuilder::new()
-        .with_title("VOXELCRAI Conscious Voxel Engine")
-        .with_inner_size(LogicalSize::new(1600.0, 900.0))
-        .build(&event_loop)?;
+    let raw_window = event_loop.create_window(
+        WindowAttributes::default()
+            .with_title("VOXELCRAI Conscious Voxel Engine")
+            .with_inner_size(LogicalSize::new(1600.0, 900.0)),
+    )?;
+    let window = Arc::new(raw_window);
 
-    let mut state = AppState::new(&window).await?;
+    let mut state = AppState::new(window.clone()).await?;
+    let window_for_loop = window.clone();
 
     event_loop.run(move |event, target| match event {
-        Event::WindowEvent { event, window_id } if window_id == window.id() => match event {
+        Event::WindowEvent { event, window_id } if window_id == window_for_loop.id() => match event {
             WindowEvent::CloseRequested => target.exit(),
             WindowEvent::Resized(size) => state.resize(size),
             WindowEvent::RedrawRequested => {
@@ -49,10 +53,8 @@ async fn run() -> Result<()> {
                 }
             }
             WindowEvent::KeyboardInput { event, .. } => {
-                if let winit::event::Key::Code(code) = event.logical_key {
-                    if code == winit::keyboard::KeyCode::Escape
-                        && event.state == ElementState::Pressed
-                    {
+                if let Key::Named(named) = event.logical_key {
+                    if named == NamedKey::Escape && event.state == ElementState::Pressed {
                         target.exit();
                     }
                 }
@@ -61,7 +63,7 @@ async fn run() -> Result<()> {
         },
         Event::AboutToWait => {
             state.update();
-            window.request_redraw();
+            window_for_loop.request_redraw();
         }
         _ => {}
     })?;
@@ -90,10 +92,10 @@ struct AppState {
 }
 
 impl AppState {
-    async fn new(window: &winit::window::Window) -> Result<Self> {
+    async fn new(window: Arc<Window>) -> Result<Self> {
         let size = window.inner_size();
         let instance = wgpu::Instance::default();
-        let surface = unsafe { instance.create_surface(window) }?;
+        let surface = instance.create_surface(window.clone())?;
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -128,6 +130,7 @@ impl AppState {
             present_mode: wgpu::PresentMode::AutoVsync,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![surface_format],
+            desired_maximum_frame_latency: 2,
         };
         surface.configure(&device, &config);
 
@@ -161,6 +164,7 @@ impl AppState {
             time: 0.0,
             delta_time: 0.0,
             grid: GRID_DIM as f32,
+            _pad: 0.0,
         };
 
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -204,6 +208,7 @@ impl AppState {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<Vertex>() as u64,
                     step_mode: wgpu::VertexStepMode::Vertex,
@@ -224,6 +229,7 @@ impl AppState {
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: "fs_main",
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: surface_format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
@@ -421,6 +427,7 @@ const CUBE_INDICES: &[u16] = &[
 ];
 
 struct TextureBundle {
+    texture: wgpu::Texture,
     view: wgpu::TextureView,
 }
 
@@ -443,7 +450,7 @@ impl TextureBundle {
             view_formats: &[],
         });
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        Self { view }
+        Self { texture, view }
     }
 }
 
