@@ -1,0 +1,4 @@
+# Clippy configuration for Adaptive Entity Engine v1.0
+
+avoid-breaking-exported-api = false
+msrv = "1.70"

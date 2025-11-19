@@ -1,0 +1,74 @@
+[package]
+name = "adaptive-entity-engine"
+version = "1.0.0"
+edition = "2021"
+authors = ["Adaptive Entity Engine Team"]
+description = "High-performance voxel engine with ECS, Vulkan rendering, and adaptive evolution"
+license = "MIT OR Apache-2.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[dependencies]
+# Graphics & Rendering
+wgpu = { version = "0.19", features = ["spirv", "glsl"] }
+bytemuck = "1.14"
+raw-window-handle = "0.6"
+winit = "0.29"
+pollster = "0.3"
+env_logger = "0.11"
+
+# ECS
+bevy_ecs = "0.13"
+bevy_utils = "0.13"
+
+# UI
+eframe = { version = "0.27", default-features = false, features = ["default_fonts", "glow"] }
+egui = "0.27"
+egui-wgpu = "0.27"
+
+# Math & Utilities
+glam = "0.27"
+nalgebra = "0.33"
+half = "2.3"
+num-traits = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Async & Networking
+tokio = { version = "1.35", features = ["full"] }
+futures = "0.3"
+
+# Monitoring & Protection
+prometheus = "0.13"
+parking_lot = "0.12"
+dashmap = "5.5"
+atomic-float = "0.1"
+
+# HIP/ROCm (optional, for AMD Vega 20 fallback)
+# rocm-smi = "0.1" # Uncomment if needed
+
+# Evolution & Genetics
+rand = "0.8"
+uuid = { version = "1.6", features = ["v4"] }
+
+# Compression & Storage
+flate2 = "1.0"
+bincode = "1.3"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "libloaderapi"] }
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+# Bare-metal AArch64 support
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bin]]
+name = "adaptive-entity-engine"
+path = "src/main.rs"

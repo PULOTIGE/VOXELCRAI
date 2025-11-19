@@ -1,0 +1,8 @@
+[build]
+target-dir = "target"
+
+[target.aarch64-unknown-none]
+rustflags = [
+    "-C", "link-arg=-Tarm/linker.ld",
+    "-C", "link-arg=-nostartfiles",
+]
