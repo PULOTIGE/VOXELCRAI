@@ -1,6 +1,30 @@
 # Changelog
 
-All notable changes to Adaptive Entity Engine v1.0 will be documented in this file.
+All notable changes to VOXELCRAI are documented here.
+
+## [1.1.0] - 2025-11-19
+
+### Added
+- Переименование проекта в **VOXELCRAI** и новый runtime на чистом winit/wgpu.
+- Модуль `engine.rs` с EventLoop, обработкой ошибок surface и логированием телеметрии.
+- `camera.rs` с полноценным контроллером (WASD/Space/Shift/ПКМ/колесо).
+- `simulation.rs` и `consciousness.rs`: движок VOXELCRAI Core (ignite/calm/trauma/concept).
+- Инстансный рендерер кубов (`renderer.rs` + `shaders/voxel.wgsl`) с depth буфером.
+- Новая структура `VoxelWorld` без bevy_ecs: генерация террейна, метрики, операции влияния.
+- Диагностический бинарь `voxelcrai-components`.
+- Обновлённые README/ARCHITECTURE/QUICKSTART/PROJECT_STRUCTURE, скрипты сборки и package.
+
+### Changed
+- Карта зависимостей: удалены bevy_ecs/eframe/egui, добавлены winit 0.29, wgpu 0.19, bytemuck, anyhow.
+- `LightPattern` и LightingSystem интегрированы в симуляцию, а не UI.
+- `ArchGuard` теперь используется сознанием для синхронизации эмпатии.
+- `build.rs` следит за `shaders/voxel.wgsl`.
+- Cargo бинарники: `voxelcrai` и `voxelcrai-components`.
+
+### Removed
+- Старый UI на eframe/egui и point-cloud renderer.
+- Модуль `ecs.rs` и зависимость от bevy_ecs.
+- Удалён ненужный шейдер `point_cloud.wgsl`.
 
 ## [1.0.0] - 2024
 

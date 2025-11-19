@@ -1,93 +1,65 @@
 # Project Structure
 
 ```
-adaptive-entity-engine/
-├── src/                          # Source code
-│   ├── main.rs                   # Entry point
-│   ├── lib.rs                    # Library exports
-│   ├── voxel.rs                  # Voxel system (9-13 KB per voxel)
-│   ├── evolution.rs              # NextGen Evolution (combine + mutate + fitness)
-│   ├── lighting.rs               # Lighting system (LightPattern: 1000 bytes)
-│   ├── renderer.rs               # wgpu renderer (Vulkan + HIP/ROCm fallback)
-│   ├── archguard.rs              # ArchGuard Enterprise protection
-│   ├── ui.rs                     # egui + eframe UI
-│   ├── ecs.rs                    # ECS utilities (bevy_ecs)
+voxelcrai/
+├── src/
+│   ├── main.rs            # запуск event loop
+│   ├── engine.rs          # EngineState (renderer + simulation + camera)
+│   ├── camera.rs          # Camera + Controller + Uniform
+│   ├── renderer.rs        # wgpu рендерер, instancing pipeline
+│   ├── simulation.rs      # связка мира, эволюции, сознания
+│   ├── consciousness.rs   # VOXELCRAI Core AI
+│   ├── voxel.rs           # данные вокселя, генерация мира, метрики
+│   ├── evolution.rs       # NextGen Evolution
+│   ├── lighting.rs        # LightPattern (1000 B) и LightingSystem
+│   ├── archguard.rs       # ArchGuard Enterprise защита
+│   ├── test_components.rs # диагностический стенд
 │   └── shaders/
-│       └── point_cloud.wgsl      # Point cloud shader
+│       └── voxel.wgsl     # WGSL шейдер для кубов
 │
-├── arm/                          # Bare-metal AArch64 support
-│   ├── boot.s                    # Boot code
-│   └── linker.ld                 # Linker script
+├── arm/                   # Bare-metal AArch64 артефакты
+│   ├── boot.s
+│   └── linker.ld
 │
-├── scripts/                      # Build and packaging scripts
-│   ├── build-release.sh          # Release build script
-│   └── package.sh                # ZIP packaging script
+├── scripts/               # Утилиты сборки
+│   ├── build-release.sh
+│   └── package.sh
 │
-├── .cargo/                       # Cargo configuration
-│   └── config.toml               # Cross-compilation settings
-│
-├── Cargo.toml                    # Project manifest
-├── build.rs                      # Build script
-├── Makefile                      # Make targets
-├── README.md                     # Main documentation
-├── ARCHITECTURE.md               # Architecture documentation
-├── CHANGELOG.md                  # Version history
-├── LICENSE-MIT                   # MIT License
-├── LICENSE-APACHE                # Apache 2.0 License
-├── .gitignore                    # Git ignore rules
-├── rustfmt.toml                  # Rustfmt configuration
-└── .clippy.toml                  # Clippy configuration
+├── Cargo.toml             # Manifest + зависимости
+├── build.rs               # Пересборка при изменении шейдера
+├── README.md / ARCHITECTURE.md / QUICKSTART.md
+└── LICENSE-APACHE / LICENSE-MIT / CHANGELOG.md / др.
 ```
 
 ## Module Dependencies
 
 ```
 main.rs
-  ├── voxel.rs
-  │   └── bevy_ecs
-  ├── evolution.rs
-  │   └── voxel::Genome
-  ├── lighting.rs
-  │   └── half::f16
-  ├── renderer.rs
-  │   ├── wgpu
-  │   └── winit
-  ├── archguard.rs
-  │   └── prometheus
-  ├── ui.rs
-  │   ├── eframe
-  │   ├── egui
-  │   ├── voxel::VoxelWorld
-  │   ├── evolution::EvolutionEngine
-  │   ├── lighting::LightingSystem
-  │   └── archguard::ArchGuard
-  └── ecs.rs
-      └── bevy_ecs
+ └── engine.rs
+      ├── renderer.rs
+      │    └── camera.rs
+      ├── simulation.rs
+      │    ├── voxel.rs
+      │    ├── evolution.rs
+      │    ├── lighting.rs
+      │    └── consciousness.rs
+      │          └── archguard.rs
+      └── log/env_logger (через main)
 ```
 
 ## Key Files
 
-### Core Engine
-- `src/voxel.rs`: Воксельная система с FP64/FP16/INT8/INT4, геномом, эволюцией
-- `src/evolution.rs`: Эволюционный алгоритм NextGen
-- `src/lighting.rs`: Система освещения с LightPattern (1000 байт)
+- `src/engine.rs` — точка входа run-loop, обработка ввода и ошибок поверхности.
+- `src/voxel.rs` — определение вокселя, генерация мира, метрики и операции влияния.
+- `src/consciousness.rs` — принятие решений VOXELCRAI, действия (ignite/calm/trauma/concept).
+- `src/simulation.rs` — общий цикл обновления, эволюция и подготовка GPU-инстансов.
+- `src/renderer.rs` + `shaders/voxel.wgsl` — Vulkan/wgpu пайплайн, instanced rendering.
+- `src/lighting.rs` — LightPattern ровно 1000 байт и их анимация.
+- `src/archguard.rs` — circuit breaker, прометей-метрики, эмпатия, ритм.
+- `src/test_components.rs` — CLI-проверка подсистем без GPU.
 
-### Rendering
-- `src/renderer.rs`: wgpu рендерер с поддержкой Vulkan и HIP/ROCm fallback
-- `src/shaders/point_cloud.wgsl`: WGSL шейдер для point cloud
+## Build Assets
 
-### Protection
-- `src/archguard.rs`: ArchGuard Enterprise (circuit-breaker, prometheus, empathy_ratio, rhythm detector)
-
-### UI
-- `src/ui.rs`: egui интерфейс с управлением движком
-
-### Build
-- `Cargo.toml`: Зависимости и конфигурация сборки
-- `build.rs`: Build script для встраивания шейдеров
-- `Makefile`: Make targets для сборки
-- `scripts/build-release.sh`: Скрипт сборки release версии
-
-### Bare-metal
-- `arm/boot.s`: AArch64 boot code
-- `arm/linker.ld`: Linker script для bare-metal
+- `scripts/build-release.sh` — релизная сборка и вывод размера бинаря.
+- `scripts/package.sh` — упаковка проекта в zip.
+- `arm/*` — демонстрационный bare-metal bootstrap (не участвует в основном рендерере).

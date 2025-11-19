@@ -1,13 +1,13 @@
 #!/bin/bash
-# Package Adaptive Entity Engine v1.0 as ZIP
+# Package VOXELCRAI as ZIP
 
 set -e
 
-PROJECT_NAME="adaptive-entity-engine-v1.0"
+PROJECT_NAME="voxelcrai"
 ZIP_NAME="${PROJECT_NAME}.zip"
 TEMP_DIR=$(mktemp -d)
 
-echo "Packaging Adaptive Entity Engine v1.0..."
+echo "Packaging VOXELCRAI..."
 
 # Copy project files
 cp -r src "$TEMP_DIR/"

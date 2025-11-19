@@ -1,9 +1,9 @@
 [package]
-name = "adaptive-entity-engine"
+name = "voxelcrai"
 version = "1.0.0"
 edition = "2021"
-authors = ["Adaptive Entity Engine Team"]
-description = "High-performance voxel engine with ECS, Vulkan rendering, and adaptive evolution"
+authors = ["VOXELCRAI Initiative"]
+description = "VOXELCRAI – conscious voxel engine powered by Rust, Vulkan/wgpu and adaptive intelligence"
 license = "MIT OR Apache-2.0"
 
 [profile.release]
@@ -14,50 +14,25 @@ panic = "abort"
 strip = true
 
 [dependencies]
-# Graphics & Rendering (optional for GUI)
-# wgpu = "0.19"
-# bytemuck = "1.14"
-# raw-window-handle = "0.5"
-# winit = "0.28"
-# pollster = "0.3"
+wgpu = "0.19"
+winit = { version = "0.29", features = ["rwh_05"] }
+pollster = "0.3"
+bytemuck = { version = "1.14", features = ["derive"] }
 env_logger = "0.11"
-
-# ECS
-bevy_ecs = "0.13"
-bevy_utils = "0.13"
-
-# UI (optional for GUI)
-# eframe = { version = "0.24", default-features = false, features = ["default_fonts", "glow"] }
-# egui = "0.24"
-# egui-wgpu = "0.24"
-
-# Math & Utilities
+log = "0.4"
 glam = "0.24"
-nalgebra = "0.32"
 half = "2.3"
 num-traits = "0.2"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-
-# Async & Networking
 tokio = { version = "1.35", features = ["full"] }
 futures = "0.3"
-
-# Monitoring & Protection
 prometheus = "0.13"
 parking_lot = "0.12"
 dashmap = "5.5"
-
-# HIP/ROCm (optional, for AMD Vega 20 fallback)
-# rocm-smi = "0.1" # Uncomment if needed
-
-# Evolution & Genetics
 rand = "0.8"
 uuid = { version = "1.6", features = ["v4"] }
-
-# Compression & Storage
 flate2 = "1.0"
 bincode = "1.3"
+anyhow = "1.0"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "libloaderapi"] }
@@ -69,9 +44,9 @@ winapi = { version = "0.3", features = ["winuser", "libloaderapi"] }
 criterion = "0.5"
 
 [[bin]]
-name = "adaptive-entity-engine"
+name = "voxelcrai"
 path = "src/main.rs"
 
 [[bin]]
-name = "test-components"
+name = "voxelcrai-components"
 path = "src/test_components.rs"
