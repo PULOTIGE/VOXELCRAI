@@ -75,3 +75,7 @@ path = "src/main.rs"
 [[bin]]
 name = "test-components"
 path = "src/test_components.rs"
+
+[[bin]]
+name = "benchmark"
+path = "src/benchmark_main.rs"

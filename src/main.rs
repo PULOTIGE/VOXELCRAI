@@ -7,6 +7,7 @@ use winit::window::Window;
 use std::time::Instant;
 use adaptive_entity_engine::engine::Engine3D;
 use adaptive_entity_engine::scene::ScenePattern;
+use adaptive_entity_engine::benchmark::BenchmarkConfig;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
@@ -34,6 +35,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  - Async Compute Management");
     println!("  - Performance Monitoring");
     println!("==============================\n");
+    println!("Controls:");
+    println!("  1/2/3 - Switch scene pattern (Sparse/Medium/Dense)");
+    println!("  B - Start 4K benchmark (RTX 4070 target)");
+    println!("  L - Start light 4K benchmark");
+    println!("  H - Start heavy 4K benchmark");
+    println!();
 
     // Main loop
     event_loop.run(move |event, elwt| {
@@ -83,20 +90,50 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                     WindowEvent::KeyboardInput { event, .. } => {
-                        // Handle keyboard input for scene pattern switching
+                        // Handle keyboard input
                         if event.state == winit::event::ElementState::Pressed {
                             match event.logical_key.as_ref() {
                                 winit::keyboard::Key::Character(c) if c == "1" => {
-                                    engine.set_scene_pattern(ScenePattern::Sparse);
-                                    println!("Switched to Sparse pattern");
+                                    if !engine.is_benchmark_mode {
+                                        engine.set_scene_pattern(ScenePattern::Sparse);
+                                        println!("Switched to Sparse pattern");
+                                    }
                                 }
                                 winit::keyboard::Key::Character(c) if c == "2" => {
-                                    engine.set_scene_pattern(ScenePattern::Medium);
-                                    println!("Switched to Medium pattern");
+                                    if !engine.is_benchmark_mode {
+                                        engine.set_scene_pattern(ScenePattern::Medium);
+                                        println!("Switched to Medium pattern");
+                                    }
                                 }
                                 winit::keyboard::Key::Character(c) if c == "3" => {
-                                    engine.set_scene_pattern(ScenePattern::Dense);
-                                    println!("Switched to Dense pattern");
+                                    if !engine.is_benchmark_mode {
+                                        engine.set_scene_pattern(ScenePattern::Dense);
+                                        println!("Switched to Dense pattern");
+                                    }
+                                }
+                                winit::keyboard::Key::Character(c) if c.to_lowercase() == "b" => {
+                                    if !engine.is_benchmark_mode {
+                                        println!("\nStarting 4K Benchmark (RTX 4070 target)...");
+                                        if let Err(e) = engine.init_benchmark_4k(BenchmarkConfig::rtx4070_4k()) {
+                                            eprintln!("Failed to start benchmark: {}", e);
+                                        }
+                                    }
+                                }
+                                winit::keyboard::Key::Character(c) if c.to_lowercase() == "l" => {
+                                    if !engine.is_benchmark_mode {
+                                        println!("\nStarting Light 4K Benchmark...");
+                                        if let Err(e) = engine.init_benchmark_4k(BenchmarkConfig::rtx4070_4k_light()) {
+                                            eprintln!("Failed to start benchmark: {}", e);
+                                        }
+                                    }
+                                }
+                                winit::keyboard::Key::Character(c) if c.to_lowercase() == "h" => {
+                                    if !engine.is_benchmark_mode {
+                                        println!("\nStarting Heavy 4K Benchmark (Stress Test)...");
+                                        if let Err(e) = engine.init_benchmark_4k(BenchmarkConfig::rtx4070_4k_heavy()) {
+                                            eprintln!("Failed to start benchmark: {}", e);
+                                        }
+                                    }
                                 }
                                 _ => {}
                             }

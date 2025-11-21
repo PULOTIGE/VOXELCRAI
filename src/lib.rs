@@ -19,6 +19,8 @@ pub mod scene;
 pub mod performance;
 pub mod async_compute;
 pub mod engine;
+pub mod benchmark;
+pub mod test_scene;
 
 // Re-export main types
 pub use archguard::ArchGuard;
@@ -35,3 +37,5 @@ pub use scene::{SceneManager, SceneObject, ScenePattern, ObjectType};
 pub use performance::{PerformanceMonitor, PerformanceStats};
 pub use async_compute::AsyncComputeManager;
 pub use engine::Engine3D;
+pub use benchmark::{BenchmarkConfig, BenchmarkRunner, BenchmarkResults};
+pub use test_scene::{TestScene4K, SceneComplexity};

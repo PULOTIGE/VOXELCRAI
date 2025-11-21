@@ -11,6 +11,8 @@ use crate::scene::{SceneManager, ScenePattern};
 use crate::performance::PerformanceMonitor;
 use crate::async_compute::AsyncComputeManager;
 use crate::pbr::Light;
+use crate::benchmark::{BenchmarkRunner, BenchmarkConfig};
+use crate::test_scene::TestScene4K;
 use bevy_ecs::prelude::*;
 
 /// Main 3D Engine
@@ -28,6 +30,8 @@ pub struct Engine3D {
     pub world: World,
     pub light: Light,
     pub delta_time: f32,
+    pub benchmark_runner: Option<BenchmarkRunner>,
+    pub is_benchmark_mode: bool,
 }
 
 impl Engine3D {
@@ -89,14 +93,15 @@ impl Engine3D {
         let mut camera = Camera::new(Vec3::new(0.0, 10.0, 20.0), Vec3::ZERO);
         camera.set_aspect(size.width as f32 / size.height as f32);
 
+        // Default: medium load (can be overridden for benchmarks)
         let mut particle_system = ParticleSystem::new(
             device.clone(),
             queue.clone(),
-            6_000_000, // 6M particles
+            2_000_000, // 2M particles default
         );
         particle_system.init_gpu()?;
 
-        let agent_system = AgentSystem::new(10000); // 10K agents
+        let agent_system = AgentSystem::new(5000); // 5K agents default
 
         let scene_manager = SceneManager::new(ScenePattern::Medium);
 
@@ -132,7 +137,53 @@ impl Engine3D {
             world,
             light,
             delta_time: 0.016,
+            benchmark_runner: None,
+            is_benchmark_mode: false,
         })
+    }
+
+    /// Initialize benchmark mode with 4K resolution
+    pub fn init_benchmark_4k(&mut self, config: BenchmarkConfig) -> Result<(), Box<dyn std::error::Error>> {
+        // Set 4K resolution
+        self.resize(3840, 2160);
+        
+        // Reinitialize particle system with benchmark particle count
+        let mut new_particle_system = ParticleSystem::new(
+            self.device.clone(),
+            self.queue.clone(),
+            config.particle_count,
+        );
+        new_particle_system.init_gpu()?;
+        self.particle_system = new_particle_system;
+
+        // Reinitialize agent system
+        self.agent_system = AgentSystem::new(config.agent_count);
+
+        // Set scene pattern
+        self.scene_manager.set_pattern(config.scene_pattern);
+
+        // Create test scene
+        TestScene4K::create_rtx4070_4k_scene(
+            &mut self.world,
+            config.agent_count,
+            config.particle_count,
+        );
+
+        // Print benchmark info
+        println!("=== Benchmark Mode Initialized ===");
+        println!("Resolution: 4K (3840x2160)");
+        println!("Particles: {}", config.particle_count);
+        println!("Agents: {}", config.agent_count);
+        println!("Scene Pattern: {:?}", config.scene_pattern);
+        println!("==================================\n");
+
+        // Initialize benchmark runner
+        let mut runner = BenchmarkRunner::new(config);
+        runner.start();
+        self.benchmark_runner = Some(runner);
+        self.is_benchmark_mode = true;
+
+        Ok(())
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -167,6 +218,18 @@ impl Engine3D {
         let vram_usage = 1000.0; // Would get from actual VRAM monitoring
         self.performance_monitor.update_gpu_metrics(gpu_load, vram_usage);
         self.performance_monitor.end_frame(self.scene_manager.pattern);
+
+        // Update benchmark if running
+        if let Some(ref mut benchmark) = self.benchmark_runner {
+            benchmark.record_frame(delta_time, gpu_load);
+            
+            if benchmark.is_complete() {
+                let results = benchmark.get_results();
+                results.print_summary();
+                self.is_benchmark_mode = false;
+                self.benchmark_runner = None;
+            }
+        }
     }
 
     pub fn render(&mut self) -> Result<(), SurfaceError> {
