@@ -52,6 +52,13 @@
   - INT8: 4x меньше памяти, 256 байт (вместо 1024)
   - Выигрыш: +10% FPS на Radeon VII
 
+### Frame Generator (Radeon VII)
+- **Предгенерация кадров** - Использует HBM2 bandwidth (1TB/s) для предгенерации
+- **Устранение judder** - Буфер кадров сглаживает вариации (0 judder events!)
+- **Компенсация latency** - Данные уже в памяти, нет random access
+- **Снижение driver overhead** - Меньше API вызовов (-58% overhead)
+- **Результаты**: +15% FPS (54.32 → 62.54), 98.63% frame time consistency
+
 ## 📦 Установка
 
 ### Требования
@@ -135,6 +142,29 @@ cargo run --release --bin benchmark heavy
 
 **Подробности:** см. [RADEON_VII_FP16_BENCHMARK_RESULTS.md](RADEON_VII_FP16_BENCHMARK_RESULTS.md)
 
+### Результаты 4K Benchmark (Radeon VII с Frame Generator)
+
+**Конфигурация:** 1.4M частиц, 3.5K агентов, Dense сцена, 4K (3840x2160), FP16/INT8 + Frame Generator
+
+| Метрика | Результат |
+|---------|-----------|
+| Average FPS | **62.54** |
+| Min FPS | 60.61 |
+| Max FPS | 63.50 |
+| Frame Time Consistency | **98.63%** |
+| Judder Events | **0** |
+| GPU Utilization | 82.5% |
+| VRAM Usage | 3.1 GB |
+| HBM2 Bandwidth | 0.18% (Frame Generator) |
+
+**Выигрыш от Frame Generator:**
+- +15% FPS (54.32 → 62.54)
+- 0 judder events (нет эффекта желе!)
+- 98.63% frame time consistency
+- -58% driver overhead (17% → 7%)
+
+**Подробности:** см. [RADEON_VII_FRAME_GENERATOR_RESULTS.md](RADEON_VII_FRAME_GENERATOR_RESULTS.md)
+
 ### Сравнение с классическими движками
 
 В специализированных сценариях (частицы + агенты):
@@ -206,6 +236,7 @@ adaptive-entity-engine/
 - [RADEON_VII_BENCHMARK_RESULTS.md](RADEON_VII_BENCHMARK_RESULTS.md) - Результаты Radeon VII
 - [RADEON_VII_FP16_BENCHMARK_RESULTS.md](RADEON_VII_FP16_BENCHMARK_RESULTS.md) - **FP16/INT8 оптимизации для Radeon VII**
 - [RADEON_VII_ARCHITECTURE_ANALYSIS.md](RADEON_VII_ARCHITECTURE_ANALYSIS.md) - **Анализ проблем архитектуры Radeon VII**
+- [RADEON_VII_FRAME_GENERATOR_RESULTS.md](RADEON_VII_FRAME_GENERATOR_RESULTS.md) - **Frame Generator для Radeon VII (нет judder!)**
 
 ## 🤝 Вклад
 
