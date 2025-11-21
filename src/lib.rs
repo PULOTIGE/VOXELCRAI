@@ -25,6 +25,7 @@ pub mod lighting_patterns;
 pub mod pattern_baker;
 pub mod benchmark_rtx3060;
 pub mod benchmark_radeon_vii;
+pub mod lighting_patterns_fp16;
 
 // Re-export main types
 pub use archguard::ArchGuard;

@@ -43,6 +43,15 @@
 - **Конфигурации** - Light, Standard, Heavy
 - **Детальная статистика** - 1% low, 0.1% low FPS, GPU utilization
 
+### Baked Lighting Patterns
+- **Pre-calculated lighting** - Библиотека предрассчитанных паттернов освещения
+- **Высокая производительность** - Минимальный overhead (0.03-0.06ms)
+- **Низкое использование памяти** - Компактные структуры (256-1024 байт)
+- **FP16/INT8 оптимизации** - Для AMD Radeon VII (Vega 20) с Rapid Packed Math
+  - FP16: 2x производительность, 512 байт (вместо 1024)
+  - INT8: 4x меньше памяти, 256 байт (вместо 1024)
+  - Выигрыш: +10% FPS на Radeon VII
+
 ## 📦 Установка
 
 ### Требования
@@ -105,6 +114,27 @@ cargo run --release --bin benchmark heavy
 
 **Подробности:** см. [BENCHMARK_RESULTS.md](BENCHMARK_RESULTS.md)
 
+### Результаты 4K Benchmark (Radeon VII с FP16/INT8)
+
+**Конфигурация:** 1.4M частиц, 3.5K агентов, Dense сцена, 4K (3840x2160), FP16/INT8 оптимизации
+
+| Метрика | Результат |
+|---------|-----------|
+| Average FPS | **54.32** |
+| Min FPS | 50.95 |
+| Max FPS | 56.00 |
+| 1% Low FPS | 50.95 |
+| GPU Utilization | 81.5% |
+| VRAM Usage | 2.8 GB |
+| Lighting Overhead | **0.03ms** (FP16/INT8) |
+
+**Выигрыш от FP16/INT8:**
+- +10% FPS (49.32 → 54.32)
+- -75% памяти (1024 → 256 байт на паттерн)
+- -50% overhead (0.06ms → 0.03ms)
+
+**Подробности:** см. [RADEON_VII_FP16_BENCHMARK_RESULTS.md](RADEON_VII_FP16_BENCHMARK_RESULTS.md)
+
 ### Сравнение с классическими движками
 
 В специализированных сценариях (частицы + агенты):
@@ -130,9 +160,12 @@ adaptive-entity-engine/
 │   ├── benchmark.rs          # Система бенчмарков
 │   ├── test_scene.rs         # Генератор тестовых сцен
 │   ├── engine.rs             # Главный движок
+│   ├── lighting_patterns.rs  # Baked lighting patterns (FP32)
+│   ├── lighting_patterns_fp16.rs  # FP16/INT8 оптимизированные паттерны
 │   └── shaders/
 │       ├── particles.wgsl    # Compute шейдер для частиц
-│       └── pbr.wgsl          # PBR шейдер
+│       ├── pbr.wgsl          # PBR шейдер
+│       └── lighting_fp16.wgsl  # FP16 оптимизированный шейдер
 ├── BENCHMARK.md              # Документация по бенчмаркам
 ├── BENCHMARK_RESULTS.md      # Результаты тестирования
 ├── BENCHMARK_QUICKSTART.md   # Быстрый старт
@@ -166,7 +199,12 @@ adaptive-entity-engine/
 - [BENCHMARK.md](BENCHMARK.md) - Подробная документация по бенчмаркам
 - [BENCHMARK_QUICKSTART.md](BENCHMARK_QUICKSTART.md) - Быстрый старт
 - [PERFORMANCE_COMPARISON.md](PERFORMANCE_COMPARISON.md) - Сравнение производительности
-- [BENCHMARK_RESULTS.md](BENCHMARK_RESULTS.md) - Результаты тестирования
+- [BENCHMARK_RESULTS.md](BENCHMARK_RESULTS.md) - Результаты тестирования (RTX 4070)
+- [BAKED_LIGHTING.md](BAKED_LIGHTING.md) - Документация по baked lighting patterns
+- [BAKED_LIGHTING_QUICKSTART.md](BAKED_LIGHTING_QUICKSTART.md) - Быстрый старт с baked lighting
+- [RTX3060_BENCHMARK_RESULTS.md](RTX3060_BENCHMARK_RESULTS.md) - Результаты RTX 3060
+- [RADEON_VII_BENCHMARK_RESULTS.md](RADEON_VII_BENCHMARK_RESULTS.md) - Результаты Radeon VII
+- [RADEON_VII_FP16_BENCHMARK_RESULTS.md](RADEON_VII_FP16_BENCHMARK_RESULTS.md) - **FP16/INT8 оптимизации для Radeon VII**
 
 ## 🤝 Вклад
 

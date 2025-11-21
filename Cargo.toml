@@ -103,3 +103,7 @@ path = "src/benchmark_radeon_vii_main.rs"
 [[bin]]
 name = "simulate-radeon-vii"
 path = "src/simulate_radeon_vii.rs"
+
+[[bin]]
+name = "simulate-radeon-vii-fp16"
+path = "src/simulate_radeon_vii_fp16.rs"
