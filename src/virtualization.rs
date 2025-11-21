@@ -128,9 +128,10 @@ impl VirtualizationManager {
         if let Some(context) = self.contexts.get_mut(&context_id) {
             if self.use_vt_d {
                 // VT-d позволяет изолировать GPU ресурсы
+                let resource_count = resources.len();
                 context.gpu_resources = resources;
                 println!("[Virtualization] Allocated {} GPU resources for context {}", 
-                         resources.len(), context_id);
+                         resource_count, context_id);
             }
         }
     }
