@@ -29,6 +29,7 @@ pub mod lighting_patterns_fp16;
 pub mod frame_generator;
 pub mod cpu_lighting_compute;
 pub mod benchmark_gtx1060;
+pub mod virtualization;
 
 // Re-export main types
 pub use archguard::ArchGuard;
