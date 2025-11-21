@@ -95,3 +95,11 @@ path = "src/benchmark_rtx3060_main.rs"
 [[bin]]
 name = "simulate-rtx3060"
 path = "src/simulate_rtx3060.rs"
+
+[[bin]]
+name = "benchmark-radeon-vii"
+path = "src/benchmark_radeon_vii_main.rs"
+
+[[bin]]
+name = "simulate-radeon-vii"
+path = "src/simulate_radeon_vii.rs"
