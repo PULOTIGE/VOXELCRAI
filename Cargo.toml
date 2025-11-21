@@ -117,3 +117,11 @@ path = "src/simulate_radeon_vii_fg.rs"
 [[bin]]
 name = "simulate-radeon-vii-cpu"
 path = "src/simulate_radeon_vii_cpu.rs"
+
+[[bin]]
+name = "benchmark-gtx1060"
+path = "src/benchmark_gtx1060_main.rs"
+
+[[bin]]
+name = "simulate-gtx1060"
+path = "src/simulate_gtx1060.rs"

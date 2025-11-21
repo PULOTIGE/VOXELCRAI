@@ -172,6 +172,26 @@ cargo run --release --bin benchmark heavy
 
 **Подробности:** см. [RADEON_VII_FRAME_GENERATOR_RESULTS.md](RADEON_VII_FRAME_GENERATOR_RESULTS.md)
 
+### Результаты 4K Benchmark (GTX 1060)
+
+**Конфигурация:** 800K частиц, 2K агентов, Medium сцена, 4K (3840x2160), Baked lighting
+
+| Метрика | Результат |
+|---------|-----------|
+| Average FPS | **29.63** |
+| Min FPS | 26.56 |
+| Max FPS | 32.50 |
+| GPU Utilization | **95.2%** |
+| VRAM Usage | 4.85 GB / 6 GB |
+| Memory Bandwidth | 78.5% |
+
+**Особенности:**
+- Работает в 4K, но на пределе возможностей
+- Высокая утилизация (95.2%) - карта работает на максимуме
+- Рекомендуется 1440p для комфортной игры
+
+**Подробности:** см. [GTX1060_BENCHMARK_RESULTS.md](GTX1060_BENCHMARK_RESULTS.md)
+
 ### Сравнение с классическими движками
 
 В специализированных сценариях (частицы + агенты):
@@ -245,6 +265,7 @@ adaptive-entity-engine/
 - [RADEON_VII_ARCHITECTURE_ANALYSIS.md](RADEON_VII_ARCHITECTURE_ANALYSIS.md) - **Анализ проблем архитектуры Radeon VII**
 - [RADEON_VII_FRAME_GENERATOR_RESULTS.md](RADEON_VII_FRAME_GENERATOR_RESULTS.md) - **Frame Generator для Radeon VII (нет judder!)**
 - [RADEON_VII_CPU_AVX2_RESULTS.md](RADEON_VII_CPU_AVX2_RESULTS.md) - **CPU AVX2 вычисления освещения для Radeon VII**
+- [GTX1060_BENCHMARK_RESULTS.md](GTX1060_BENCHMARK_RESULTS.md) - **Результаты GTX 1060 в 4K**
 
 ## 🤝 Вклад
 

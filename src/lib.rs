@@ -28,6 +28,7 @@ pub mod benchmark_radeon_vii;
 pub mod lighting_patterns_fp16;
 pub mod frame_generator;
 pub mod cpu_lighting_compute;
+pub mod benchmark_gtx1060;
 
 // Re-export main types
 pub use archguard::ArchGuard;
