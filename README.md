@@ -59,6 +59,13 @@
 - **Снижение driver overhead** - Меньше API вызовов (-58% overhead)
 - **Результаты**: +15% FPS (54.32 → 62.54), 98.63% frame time consistency
 
+### CPU AVX2 Lighting (Radeon VII)
+- **CPU вычисления** - AVX2 инструкции для параллельных вычислений (8 float одновременно)
+- **Освобождение GPU** - GPU фокусируется только на рендеринге
+- **Многопоточность** - 16 потоков для максимальной производительности
+- **Гибкость** - Паттерны можно менять на лету (динамическое освещение)
+- **Результаты**: +15% FPS (62.54 → 72.00), GPU освобожден, 98.70% frame time consistency
+
 ## 📦 Установка
 
 ### Требования
@@ -237,6 +244,7 @@ adaptive-entity-engine/
 - [RADEON_VII_FP16_BENCHMARK_RESULTS.md](RADEON_VII_FP16_BENCHMARK_RESULTS.md) - **FP16/INT8 оптимизации для Radeon VII**
 - [RADEON_VII_ARCHITECTURE_ANALYSIS.md](RADEON_VII_ARCHITECTURE_ANALYSIS.md) - **Анализ проблем архитектуры Radeon VII**
 - [RADEON_VII_FRAME_GENERATOR_RESULTS.md](RADEON_VII_FRAME_GENERATOR_RESULTS.md) - **Frame Generator для Radeon VII (нет judder!)**
+- [RADEON_VII_CPU_AVX2_RESULTS.md](RADEON_VII_CPU_AVX2_RESULTS.md) - **CPU AVX2 вычисления освещения для Radeon VII**
 
 ## 🤝 Вклад
 
