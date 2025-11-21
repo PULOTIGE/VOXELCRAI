@@ -24,7 +24,11 @@ impl Renderer {
             ..Default::default()
         });
         
-        let surface = instance.create_surface(window)?;
+        let surface = unsafe {
+            instance.create_surface_unsafe(
+                wgpu::SurfaceTargetUnsafe::from_window(window)?
+            )?
+        };
         
         // Request adapter
         let adapter = pollster::block_on(instance.request_adapter(&RequestAdapterOptions {
@@ -84,7 +88,8 @@ impl Renderer {
             layout: Some(&render_pipeline_layout),
             vertex: VertexState {
                 module: &shader,
-                entry_point: Some("vs_main"),
+                entry_point: "vs_main",
+                compilation_options: PipelineCompilationOptions::default(),
                 buffers: &[VertexBufferLayout {
                     array_stride: 24, // 3 f32 position + 3 f32 color
                     step_mode: VertexStepMode::Vertex,
@@ -104,7 +109,8 @@ impl Renderer {
             },
             fragment: Some(FragmentState {
                 module: &shader,
-                entry_point: Some("fs_main"),
+                entry_point: "fs_main",
+                compilation_options: PipelineCompilationOptions::default(),
                 targets: &[Some(ColorTargetState {
                     format: config.format,
                     blend: Some(BlendState::ALPHA_BLENDING),

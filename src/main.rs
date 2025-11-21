@@ -1,42 +1,116 @@
-#[cfg(feature = "gui")]
-mod archguard;
-#[cfg(feature = "gui")]
-mod ecs;
-#[cfg(feature = "gui")]
-mod evolution;
-#[cfg(feature = "gui")]
-mod lighting;
-#[cfg(feature = "gui")]
-mod renderer;
-#[cfg(feature = "gui")]
-mod ui;
-#[cfg(feature = "gui")]
-mod voxel;
+// Main entry point for the 3D Engine
+use winit::{
+    event::{Event, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+};
+use winit::window::Window;
+use std::time::Instant;
+use adaptive_entity_engine::engine::Engine3D;
+use adaptive_entity_engine::scene::ScenePattern;
 
-#[cfg(feature = "gui")]
-fn main() -> Result<(), eframe::Error> {
-    use eframe::egui;
-    use ui::EngineUI;
-    
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1920.0, 1080.0])
-            .with_title("Adaptive Entity Engine v1.0"),
-        ..Default::default()
-    };
+    // Create event loop and window
+    let event_loop = EventLoop::new()?;
+    let window_attributes = Window::default_attributes()
+        .with_title("Minimalistic 3D Engine - Dynamic Scene Prototyping")
+        .with_inner_size(winit::dpi::LogicalSize::new(1280, 720));
+    let window = event_loop.create_window(window_attributes)?;
 
-    eframe::run_native(
-        "Adaptive Entity Engine v1.0",
-        options,
-        Box::new(|_cc| {
-            Ok(Box::new(EngineUI::new()))
-        }),
-    )
-}
+    // Initialize engine
+    let mut engine = Engine3D::new(&window)?;
 
-#[cfg(not(feature = "gui"))]
-fn main() {
-    println!("GUI feature not enabled. Run 'cargo run --bin test-components' to test core components.");
+    // Timing
+    let mut last_frame_time = Instant::now();
+    let mut frame_count = 0u32;
+
+    println!("=== Minimalistic 3D Engine ===");
+    println!("Features:");
+    println!("  - Rendering Pipeline with PBR materials");
+    println!("  - Particle System (GPU compute, up to 6M particles)");
+    println!("  - Voxel Agent System (FSM behaviors, spatial hash, LOD)");
+    println!("  - Scene Manager (Sparse/Medium/Dense patterns)");
+    println!("  - Async Compute Management");
+    println!("  - Performance Monitoring");
+    println!("==============================\n");
+
+    // Main loop
+    event_loop.run(move |event, elwt| {
+        elwt.set_control_flow(ControlFlow::Poll);
+
+        match event {
+            Event::WindowEvent {
+                ref event,
+                window_id,
+            } if window_id == window.id() => {
+                match event {
+                    WindowEvent::CloseRequested => {
+                        elwt.exit();
+                    }
+                    WindowEvent::Resized(physical_size) => {
+                        engine.resize(physical_size.width, physical_size.height);
+                    }
+                    WindowEvent::RedrawRequested => {
+                        // Calculate delta time
+                        let now = Instant::now();
+                        let delta_time = last_frame_time.elapsed().as_secs_f32();
+                        last_frame_time = now;
+
+                        // Update engine
+                        engine.update(delta_time);
+
+                        // Render
+                        match engine.render() {
+                            Ok(_) => {}
+                            Err(wgpu::SurfaceError::Lost) => {
+                                engine.resize(engine.config.width, engine.config.height);
+                            }
+                            Err(wgpu::SurfaceError::OutOfMemory) => {
+                                elwt.exit();
+                            }
+                            Err(e) => eprintln!("Render error: {:?}", e),
+                        }
+
+                        // Request next frame
+                        window.request_redraw();
+
+                        // Log FPS every 60 frames
+                        frame_count += 1;
+                        if frame_count % 60 == 0 {
+                            let fps = 1.0 / delta_time.max(0.0001);
+                            println!("FPS: {:.2}, Frame Time: {:.3}ms", fps, delta_time * 1000.0);
+                        }
+                    }
+                    WindowEvent::KeyboardInput { event, .. } => {
+                        // Handle keyboard input for scene pattern switching
+                        if event.state == winit::event::ElementState::Pressed {
+                            match event.logical_key.as_ref() {
+                                winit::keyboard::Key::Character(c) if c == "1" => {
+                                    engine.set_scene_pattern(ScenePattern::Sparse);
+                                    println!("Switched to Sparse pattern");
+                                }
+                                winit::keyboard::Key::Character(c) if c == "2" => {
+                                    engine.set_scene_pattern(ScenePattern::Medium);
+                                    println!("Switched to Medium pattern");
+                                }
+                                winit::keyboard::Key::Character(c) if c == "3" => {
+                                    engine.set_scene_pattern(ScenePattern::Dense);
+                                    println!("Switched to Dense pattern");
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Event::AboutToWait => {
+                window.request_redraw();
+            }
+            _ => {}
+        }
+    })?;
+
+    Ok(())
 }

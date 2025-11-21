@@ -1,11 +1,19 @@
+#[cfg(feature = "gui")]
 use crate::archguard::ArchGuard;
+#[cfg(feature = "gui")]
 use crate::evolution::EvolutionEngine;
+#[cfg(feature = "gui")]
 use crate::lighting::LightingSystem;
+#[cfg(feature = "gui")]
 use crate::voxel::VoxelWorld;
+#[cfg(feature = "gui")]
 use eframe::egui;
+#[cfg(feature = "gui")]
 use std::sync::atomic::Ordering;
+#[cfg(feature = "gui")]
 use std::time::Instant;
 
+#[cfg(feature = "gui")]
 pub struct EngineUI {
     world: VoxelWorld,
     evolution: EvolutionEngine,
@@ -17,6 +25,7 @@ pub struct EngineUI {
     point_cloud_data: Vec<([f32; 3], [f32; 3])>,
 }
 
+#[cfg(feature = "gui")]
 impl EngineUI {
     pub fn new() -> Self {
         Self {
@@ -32,6 +41,7 @@ impl EngineUI {
     }
 }
 
+#[cfg(feature = "gui")]
 impl eframe::App for EngineUI {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let delta_time = ctx.input(|i| i.stable_dt);
