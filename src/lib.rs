@@ -23,6 +23,7 @@ pub mod benchmark;
 pub mod test_scene;
 pub mod lighting_patterns;
 pub mod pattern_baker;
+pub mod benchmark_rtx3060;
 
 // Re-export main types
 pub use archguard::ArchGuard;

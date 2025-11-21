@@ -13,6 +13,7 @@ use crate::async_compute::AsyncComputeManager;
 use crate::pbr::Light;
 use crate::benchmark::{BenchmarkRunner, BenchmarkConfig};
 use crate::test_scene::TestScene4K;
+use crate::lighting_patterns::{LightingPatternLibrary, PatternType};
 use bevy_ecs::prelude::*;
 
 /// Main 3D Engine
@@ -32,6 +33,8 @@ pub struct Engine3D {
     pub delta_time: f32,
     pub benchmark_runner: Option<BenchmarkRunner>,
     pub is_benchmark_mode: bool,
+    pub lighting_library: LightingPatternLibrary,
+    pub current_lighting_pattern: Option<PatternType>,
 }
 
 impl Engine3D {
@@ -122,6 +125,7 @@ impl Engine3D {
         }
 
         let light = Light::default();
+        let lighting_library = LightingPatternLibrary::new();
 
         Ok(Self {
             device,
@@ -139,6 +143,8 @@ impl Engine3D {
             delta_time: 0.016,
             benchmark_runner: None,
             is_benchmark_mode: false,
+            lighting_library,
+            current_lighting_pattern: None,
         })
     }
 

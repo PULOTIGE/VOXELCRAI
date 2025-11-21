@@ -87,3 +87,11 @@ path = "src/simulate_benchmark.rs"
 [[bin]]
 name = "bake-patterns"
 path = "src/bake_patterns.rs"
+
+[[bin]]
+name = "benchmark-rtx3060"
+path = "src/benchmark_rtx3060_main.rs"
+
+[[bin]]
+name = "simulate-rtx3060"
+path = "src/simulate_rtx3060.rs"
