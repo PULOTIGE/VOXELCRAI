@@ -83,3 +83,7 @@ path = "src/benchmark_main.rs"
 [[bin]]
 name = "simulate-benchmark"
 path = "src/simulate_benchmark.rs"
+
+[[bin]]
+name = "bake-patterns"
+path = "src/bake_patterns.rs"

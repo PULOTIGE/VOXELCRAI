@@ -21,6 +21,8 @@ pub mod async_compute;
 pub mod engine;
 pub mod benchmark;
 pub mod test_scene;
+pub mod lighting_patterns;
+pub mod pattern_baker;
 
 // Re-export main types
 pub use archguard::ArchGuard;

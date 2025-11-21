@@ -11,3 +11,7 @@ Cargo.lock
 *.swo
 *~
 .DS_Store
+
+# Baked lighting patterns (генерируются автоматически)
+patterns/
+*.pattern
