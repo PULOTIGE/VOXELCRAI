@@ -292,6 +292,7 @@ adaptive-entity-engine/
 - [RTX3060_BENCHMARK_RESULTS.md](RTX3060_BENCHMARK_RESULTS.md) - Результаты RTX 3060 (базовый)
 - [RTX3060_DETAILED_BENCHMARK_RESULTS.md](RTX3060_DETAILED_BENCHMARK_RESULTS.md) - **Детальный тест RTX 3060**
 - [RTX3060_METRICS_EXPLANATION.md](RTX3060_METRICS_EXPLANATION.md) - **Объяснение всех метрик**
+- [BENCHMARK_SUMMARY.md](BENCHMARK_SUMMARY.md) - **📊 Итоговый обзор RTX 3060 бенчмарков**
 - [RADEON_VII_BENCHMARK_RESULTS.md](RADEON_VII_BENCHMARK_RESULTS.md) - Результаты Radeon VII
 - [RADEON_VII_FP16_BENCHMARK_RESULTS.md](RADEON_VII_FP16_BENCHMARK_RESULTS.md) - **FP16/INT8 оптимизации для Radeon VII**
 - [RADEON_VII_ARCHITECTURE_ANALYSIS.md](RADEON_VII_ARCHITECTURE_ANALYSIS.md) - **Анализ проблем архитектуры Radeon VII**
