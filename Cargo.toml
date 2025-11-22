@@ -125,3 +125,7 @@ path = "src/benchmark_gtx1060_main.rs"
 [[bin]]
 name = "simulate-gtx1060"
 path = "src/simulate_gtx1060.rs"
+
+[[bin]]
+name = "simulate-rtx3060-full"
+path = "src/simulate_rtx3060_full.rs"
