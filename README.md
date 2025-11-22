@@ -199,6 +199,29 @@ cargo run --release --bin benchmark heavy
 
 **Подробности:** см. [GTX1060_BENCHMARK_RESULTS.md](GTX1060_BENCHMARK_RESULTS.md)
 
+### Результаты 4K Benchmark (RTX 3060 со всеми оптимизациями)
+
+**Конфигурация:** 1.5M частиц, 4K агентов, Dense сцена, 4K (3840x2160), Все оптимизации
+
+| Фаза | FPS | Прирост |
+|------|-----|---------|
+| Базовый тест | 44.00 | - |
+| + Baked Lighting | 47.17 | +7.2% |
+| + FP16/INT8 | 50.34 | +14.4% |
+| + Frame Generator | 52.87 | +20.1% |
+| + CPU AVX2 | 55.19 | +25.4% |
+| + Виртуализация | **54.08** | **+22.9%** |
+
+**Особенности:**
+- Полностью играбельно в 4K (54+ FPS)
+- Оптимальная загрузка GPU (82%)
+- 0 judder events с Frame Generator
+- Детальный пофазовый анализ оптимизаций
+
+**Подробности:** 
+- [RTX3060_DETAILED_BENCHMARK_RESULTS.md](RTX3060_DETAILED_BENCHMARK_RESULTS.md) - Полные результаты
+- [RTX3060_METRICS_EXPLANATION.md](RTX3060_METRICS_EXPLANATION.md) - Объяснение всех метрик
+
 ### Сравнение с классическими движками
 
 В специализированных сценариях (частицы + агенты):
@@ -266,7 +289,9 @@ adaptive-entity-engine/
 - [BENCHMARK_RESULTS.md](BENCHMARK_RESULTS.md) - Результаты тестирования (RTX 4070)
 - [BAKED_LIGHTING.md](BAKED_LIGHTING.md) - Документация по baked lighting patterns
 - [BAKED_LIGHTING_QUICKSTART.md](BAKED_LIGHTING_QUICKSTART.md) - Быстрый старт с baked lighting
-- [RTX3060_BENCHMARK_RESULTS.md](RTX3060_BENCHMARK_RESULTS.md) - Результаты RTX 3060
+- [RTX3060_BENCHMARK_RESULTS.md](RTX3060_BENCHMARK_RESULTS.md) - Результаты RTX 3060 (базовый)
+- [RTX3060_DETAILED_BENCHMARK_RESULTS.md](RTX3060_DETAILED_BENCHMARK_RESULTS.md) - **Детальный тест RTX 3060**
+- [RTX3060_METRICS_EXPLANATION.md](RTX3060_METRICS_EXPLANATION.md) - **Объяснение всех метрик**
 - [RADEON_VII_BENCHMARK_RESULTS.md](RADEON_VII_BENCHMARK_RESULTS.md) - Результаты Radeon VII
 - [RADEON_VII_FP16_BENCHMARK_RESULTS.md](RADEON_VII_FP16_BENCHMARK_RESULTS.md) - **FP16/INT8 оптимизации для Radeon VII**
 - [RADEON_VII_ARCHITECTURE_ANALYSIS.md](RADEON_VII_ARCHITECTURE_ANALYSIS.md) - **Анализ проблем архитектуры Radeon VII**
