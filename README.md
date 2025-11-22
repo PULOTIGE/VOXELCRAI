@@ -298,6 +298,7 @@ adaptive-entity-engine/
 - [RADEON_VII_FRAME_GENERATOR_RESULTS.md](RADEON_VII_FRAME_GENERATOR_RESULTS.md) - **Frame Generator для Radeon VII (нет judder!)**
 - [RADEON_VII_CPU_AVX2_RESULTS.md](RADEON_VII_CPU_AVX2_RESULTS.md) - **CPU AVX2 вычисления освещения для Radeon VII**
 - [GTX1060_BENCHMARK_RESULTS.md](GTX1060_BENCHMARK_RESULTS.md) - **Результаты GTX 1060 в 4K**
+- [GPU_COMPARISON_DETAILED.md](GPU_COMPARISON_DETAILED.md) - **Детальное сравнение всех протестированных GPU**
 - [VIRTUALIZATION.md](VIRTUALIZATION.md) - **Виртуализация компонентов движка (VT-x, VT-d, EPT)**
 
 ## 🤝 Вклад
