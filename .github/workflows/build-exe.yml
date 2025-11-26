@@ -1,0 +1,55 @@
+name: Build Mega EXE
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: x86_64-pc-windows-msvc
+        override: true
+    
+    - name: Build Mega EXE
+      run: |
+        $env:RUSTFLAGS = "-C target-feature=+crt-static"
+        $env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS = "-C target-feature=+crt-static"
+        cargo build --release --target x86_64-pc-windows-msvc --features "gui,all-integrations" --bin adaptive-entity-engine
+    
+    - name: Create dist directory
+      run: |
+        New-Item -ItemType Directory -Force -Path dist\windows
+    
+    - name: Copy EXE
+      run: |
+        Copy-Item target\x86_64-pc-windows-msvc\release\adaptive-entity-engine.exe dist\windows\
+    
+    - name: Create README
+      run: |
+        Copy-Item dist\windows\README.txt dist\windows\README.txt
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: adaptive-entity-engine-exe
+        path: dist/windows/adaptive-entity-engine.exe
+        retention-days: 30
+    
+    - name: Commit EXE to repository
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add dist/windows/adaptive-entity-engine.exe
+        git commit -m "Add built Mega EXE file" || exit 0
+        git push || exit 0
