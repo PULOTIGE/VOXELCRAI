@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.voxelcraft.game'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.voxelcraft.game"
+        minSdk 28
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+        
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+
+    ndkVersion "25.2.9519653"
+}
+
+dependencies {
+    implementation 'androidx.games:games-activity:2.0.2'
+    implementation 'androidx.core:core-ktx:1.12.0'
+}
