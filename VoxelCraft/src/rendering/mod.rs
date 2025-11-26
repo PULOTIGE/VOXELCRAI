@@ -49,28 +49,36 @@ struct ChunkRenderData {
 }
 
 impl Renderer {
-    pub async fn new(window: Arc<Window>) -> Self {
+    pub async fn try_new(window: Arc<Window>) -> Result<Self, String> {
         let size = window.inner_size();
         let width = size.width.max(1);
         let height = size.height.max(1);
 
+        log::info!("Creating wgpu instance...");
+
         // Create instance and surface
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
+            backends: wgpu::Backends::VULKAN | wgpu::Backends::GL,
             ..Default::default()
         });
 
-        let surface = instance.create_surface(window).unwrap();
+        log::info!("Creating surface...");
+        let surface = instance.create_surface(window)
+            .map_err(|e| format!("Failed to create surface: {}", e))?;
 
+        log::info!("Requesting adapter...");
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::HighPerformance,
+                power_preference: wgpu::PowerPreference::LowPower,
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
             })
             .await
-            .unwrap();
+            .ok_or("No suitable GPU adapter found")?;
 
+        log::info!("Adapter: {:?}", adapter.get_info());
+
+        log::info!("Requesting device...");
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
@@ -81,10 +89,14 @@ impl Renderer {
                 None,
             )
             .await
-            .unwrap();
+            .map_err(|e| format!("Failed to create device: {}", e))?;
+
+        log::info!("Device created successfully");
 
         let surface_caps = surface.get_capabilities(&adapter);
-        let surface_format = surface_caps.formats[0];
+        let surface_format = surface_caps.formats.first()
+            .copied()
+            .ok_or("No surface formats available")?;
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -322,7 +334,9 @@ impl Renderer {
             multiview: None,
         });
 
-        Self {
+        log::info!("Renderer created successfully!");
+        
+        Ok(Self {
             device,
             queue,
             surface,
@@ -340,7 +354,7 @@ impl Renderer {
             light_bind_group,
             chunk_meshes: HashMap::new(),
             time: 0.0,
-        }
+        })
     }
 
     fn create_depth_texture(device: &wgpu::Device, width: u32, height: u32) -> (wgpu::Texture, wgpu::TextureView) {

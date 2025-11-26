@@ -149,7 +149,15 @@ impl Game {
     }
 
     pub fn init_renderer(&mut self, window: Arc<Window>) {
-        self.renderer = Some(pollster::block_on(Renderer::new(window)));
+        match pollster::block_on(Renderer::try_new(window)) {
+            Ok(renderer) => {
+                self.renderer = Some(renderer);
+                log::info!("Renderer initialized successfully");
+            }
+            Err(e) => {
+                log::error!("Failed to initialize renderer: {}", e);
+            }
+        }
     }
 
     pub fn update(&mut self, dt: f32) {
@@ -244,9 +252,16 @@ impl Game {
     }
 }
 
+// Android entry point
+#[cfg(target_os = "android")]
+use winit::platform::android::activity::AndroidApp;
+
 #[cfg(target_os = "android")]
 #[no_mangle]
-fn android_main(_app: winit::platform::android::activity::AndroidApp) {
+fn android_main(app: AndroidApp) {
+    use winit::event_loop::EventLoopBuilder;
+    use winit::platform::android::EventLoopBuilderExtAndroid;
+    
     android_logger::init_once(
         android_logger::Config::default()
             .with_max_level(log::LevelFilter::Info),
@@ -254,71 +269,114 @@ fn android_main(_app: winit::platform::android::activity::AndroidApp) {
     
     log::info!("VoxelCraft starting...");
     
-    // Run game
-    run_game();
+    let event_loop = EventLoopBuilder::new()
+        .with_android_app(app)
+        .build()
+        .expect("Failed to create event loop");
+    
+    run_game_loop(event_loop);
 }
 
+#[cfg(not(target_os = "android"))]
 pub fn run_game() {
     let event_loop = EventLoop::new().unwrap();
-    
-    #[cfg(target_os = "android")]
-    let window = WindowBuilder::new()
-        .with_title("VoxelCraft")
-        .build(&event_loop)
-        .unwrap();
-    
-    #[cfg(not(target_os = "android"))]
-    let window = WindowBuilder::new()
-        .with_title("VoxelCraft")
-        .with_inner_size(winit::dpi::LogicalSize::new(1280, 720))
-        .build(&event_loop)
-        .unwrap();
+    run_game_loop(event_loop);
+}
 
-    let window = Arc::new(window);
-    
-    let mut game = Game::new(rand::random());
-    game.init_renderer(window.clone());
-    
-    // Try to load saved game
-    game.load();
-
+fn run_game_loop(event_loop: EventLoop<()>) {
+    let mut game: Option<Game> = None;
+    let mut window: Option<Arc<Window>> = None;
     let mut last_time = std::time::Instant::now();
 
     let _ = event_loop.run(move |event, target| {
         target.set_control_flow(ControlFlow::Poll);
 
         match event {
-            Event::WindowEvent { event, .. } => match event {
-                WindowEvent::CloseRequested => target.exit(),
+            Event::Resumed => {
+                log::info!("App resumed, creating window...");
                 
-                WindowEvent::Resized(size) => {
-                    game.resize(size.width, size.height);
+                // Create window on resume
+                let new_window = WindowBuilder::new()
+                    .with_title("VoxelCraft")
+                    .build(target)
+                    .expect("Failed to create window");
+                
+                let new_window = Arc::new(new_window);
+                
+                // Initialize game if not already
+                if game.is_none() {
+                    log::info!("Initializing game...");
+                    let mut new_game = Game::new(rand::random());
+                    new_game.init_renderer(new_window.clone());
+                    let _ = new_game.load();
+                    game = Some(new_game);
+                    log::info!("Game initialized!");
+                } else if let Some(ref mut g) = game {
+                    // Reinitialize renderer on resume
+                    g.init_renderer(new_window.clone());
                 }
                 
-                WindowEvent::Touch(touch) => {
-                    game.handle_touch(touch);
-                }
-                
-                WindowEvent::RedrawRequested => {
-                    let now = std::time::Instant::now();
-                    let dt = (now - last_time).as_secs_f32();
-                    last_time = now;
-
-                    game.update(dt.min(0.1)); // Cap dt to avoid physics issues
-                    game.render();
-                    
-                    window.request_redraw();
-                }
-                
-                _ => {}
-            },
-            
-            Event::Suspended => {
-                game.save();
+                window = Some(new_window);
             }
             
-            Event::Resumed => {
-                window.request_redraw();
+            Event::Suspended => {
+                log::info!("App suspended, saving...");
+                if let Some(ref g) = game {
+                    g.save();
+                }
+                // Drop renderer on suspend
+                if let Some(ref mut g) = game {
+                    g.renderer = None;
+                }
+                window = None;
+            }
+            
+            Event::WindowEvent { event, .. } => {
+                match event {
+                    WindowEvent::CloseRequested => {
+                        if let Some(ref g) = game {
+                            g.save();
+                        }
+                        target.exit();
+                    }
+                    
+                    WindowEvent::Resized(size) => {
+                        if let Some(ref mut g) = game {
+                            if size.width > 0 && size.height > 0 {
+                                g.resize(size.width, size.height);
+                            }
+                        }
+                    }
+                    
+                    WindowEvent::Touch(touch) => {
+                        if let Some(ref mut g) = game {
+                            g.handle_touch(touch);
+                        }
+                    }
+                    
+                    WindowEvent::RedrawRequested => {
+                        let now = std::time::Instant::now();
+                        let dt = (now - last_time).as_secs_f32();
+                        last_time = now;
+
+                        if let Some(ref mut g) = game {
+                            g.update(dt.min(0.1));
+                            g.render();
+                        }
+                        
+                        if let Some(ref w) = window {
+                            w.request_redraw();
+                        }
+                    }
+                    
+                    _ => {}
+                }
+            }
+            
+            Event::AboutToWait => {
+                if let Some(ref w) = window {
+                    w.request_redraw();
+                }
             }
             
             _ => {}
