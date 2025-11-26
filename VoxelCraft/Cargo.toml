@@ -1,6 +1,6 @@
 [package]
 name = "voxelcraft"
-version = "1.0.0"
+version = "1.0.2"
 edition = "2021"
 authors = ["VoxelCraft Team"]
 description = "Minecraft-like voxel game for Android with pattern lighting"
@@ -38,18 +38,17 @@ env_logger = "0.10"
 [target.'cfg(target_os = "android")'.dependencies]
 winit = { version = "0.29", features = ["android-native-activity"] }
 android_logger = "0.14"
-ndk = "0.9"
+android-activity = { version = "0.5", features = ["native-activity"] }
+ndk = "0.8"
 jni = "0.21"
 
 [profile.release]
-lto = true
-codegen-units = 1
-opt-level = 3
-strip = true
+lto = "thin"
+codegen-units = 4
+opt-level = 2
 
 [profile.dev]
 opt-level = 1
 
 [features]
 default = []
-android = []

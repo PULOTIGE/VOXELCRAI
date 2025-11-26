@@ -40,7 +40,7 @@ impl GameState {
             player: Player::new(),
             crafting: CraftingSystem::new(),
             entities: Vec::new(),
-            time_of_day: 0.25, // Start at morning
+            time_of_day: 0.25,
             day_count: 1,
             paused: false,
         }
@@ -51,31 +51,20 @@ impl GameState {
             return;
         }
 
-        // Update time
-        self.time_of_day += dt / 600.0; // 10 minute day cycle
+        self.time_of_day += dt / 600.0;
         if self.time_of_day >= 1.0 {
             self.time_of_day = 0.0;
             self.day_count += 1;
         }
 
-        // Update world (generate chunks around player)
         let player_chunk = self.world.world_to_chunk(self.player.position);
-        self.world.update_around(player_chunk, 4);
-
-        // Update player
+        self.world.update_around(player_chunk, 3);
         self.player.update(dt, &self.world);
 
-        // Update entities
         for entity in &mut self.entities {
             entity.update(dt, &self.world, &self.player);
         }
 
-        // Spawn mobs at night
-        if self.is_night() {
-            self.spawn_night_mobs();
-        }
-
-        // Remove dead entities
         self.entities.retain(|e| e.is_alive());
     }
 
@@ -90,84 +79,77 @@ impl GameState {
 
     pub fn get_ambient_light(&self) -> f32 {
         if self.is_night() {
-            0.1
+            0.15
         } else {
             let noon_factor = (self.time_of_day - 0.5).abs() * 2.0;
             0.3 + (1.0 - noon_factor) * 0.7
         }
     }
-
-    fn spawn_night_mobs(&mut self) {
-        // Limit mob count
-        if self.entities.len() >= 50 {
-            return;
-        }
-
-        // Random spawn chance
-        if rand::random::<f32>() > 0.01 {
-            return;
-        }
-
-        // Spawn zombie near player
-        let offset = glam::Vec3::new(
-            (rand::random::<f32>() - 0.5) * 40.0,
-            0.0,
-            (rand::random::<f32>() - 0.5) * 40.0,
-        );
-
-        let spawn_pos = self.player.position + offset;
-        let ground_y = self.world.get_height_at(spawn_pos.x as i32, spawn_pos.z as i32) as f32 + 1.0;
-
-        if ground_y > 0.0 {
-            let zombie = Box::new(Mob::new(
-                EntityType::Zombie,
-                glam::Vec3::new(spawn_pos.x, ground_y, spawn_pos.z),
-            ));
-            self.entities.push(zombie);
-        }
-    }
 }
 
-/// Main game entry point
+/// Main game
 pub struct Game {
     pub state: GameState,
     pub renderer: Option<Renderer>,
     pub ui: GameUI,
     pub touch_input: TouchInput,
     pub save_system: SaveSystem,
+    pub initialized: bool,
 }
 
 impl Game {
     pub fn new(seed: u64) -> Self {
+        log::info!("Creating new game with seed: {}", seed);
         Self {
             state: GameState::new(seed),
             renderer: None,
             ui: GameUI::new(),
             touch_input: TouchInput::new(),
             save_system: SaveSystem::new(),
+            initialized: false,
         }
     }
 
     pub fn init_renderer(&mut self, window: Arc<Window>) {
-        match pollster::block_on(Renderer::try_new(window)) {
-            Ok(renderer) => {
+        log::info!("Initializing renderer...");
+        
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            pollster::block_on(Renderer::try_new(window))
+        })) {
+            Ok(Ok(renderer)) => {
                 self.renderer = Some(renderer);
-                log::info!("Renderer initialized successfully");
+                self.initialized = true;
+                log::info!("Renderer initialized successfully!");
+            }
+            Ok(Err(e)) => {
+                log::error!("Failed to create renderer: {}", e);
+                self.initialized = false;
             }
             Err(e) => {
-                log::error!("Failed to initialize renderer: {}", e);
+                log::error!("Renderer panicked: {:?}", e);
+                self.initialized = false;
             }
         }
     }
 
     pub fn update(&mut self, dt: f32) {
-        // Process touch input
-        self.process_input(dt);
+        if !self.initialized {
+            return;
+        }
+        
+        if let Some(move_dir) = self.touch_input.get_movement() {
+            self.state.player.move_direction(move_dir, dt);
+        }
 
-        // Update game state
+        if let Some(look_delta) = self.touch_input.get_look_delta() {
+            self.state.player.rotate(look_delta.x * 0.01, look_delta.y * 0.01);
+        }
+
+        if self.touch_input.is_jump_pressed() {
+            self.state.player.jump();
+        }
+
         self.state.update(dt);
-
-        // Update UI
         self.ui.update(&self.state, &self.touch_input);
     }
 
@@ -177,65 +159,17 @@ impl Game {
         }
     }
 
-    fn process_input(&mut self, dt: f32) {
-        // Movement from joystick
-        if let Some(move_dir) = self.touch_input.get_movement() {
-            self.state.player.move_direction(move_dir, dt);
-        }
-
-        // Camera from look area
-        if let Some(look_delta) = self.touch_input.get_look_delta() {
-            self.state.player.rotate(look_delta.x * 0.01, look_delta.y * 0.01);
-        }
-
-        // Jump button
-        if self.touch_input.is_jump_pressed() {
-            self.state.player.jump();
-        }
-
-        // Break/Place block
-        if self.touch_input.is_action_pressed() {
-            self.handle_block_action();
-        }
-    }
-
-    fn handle_block_action(&mut self) {
-        let (hit, pos, face) = self.state.world.raycast(
-            self.state.player.get_eye_position(),
-            self.state.player.get_look_direction(),
-            5.0,
-        );
-
-        if hit {
-            if self.touch_input.is_break_mode() {
-                // Break block
-                if let Some(block) = self.state.world.get_block(pos.x, pos.y, pos.z) {
-                    // Add to inventory
-                    self.state.player.inventory.add_item(ItemStack::from_block(block));
-                    self.state.world.set_block(pos.x, pos.y, pos.z, BlockType::Air);
-                }
-            } else {
-                // Place block
-                let place_pos = pos + face;
-                if let Some(item) = self.state.player.inventory.get_selected() {
-                    if let Some(block_type) = item.as_block() {
-                        self.state.world.set_block(place_pos.x, place_pos.y, place_pos.z, block_type);
-                        self.state.player.inventory.consume_selected();
-                    }
-                }
-            }
-        }
-    }
-
     pub fn handle_touch(&mut self, touch: Touch) {
         self.touch_input.handle_touch(touch, self.ui.get_screen_size());
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        if let Some(renderer) = &mut self.renderer {
-            renderer.resize(width, height);
+        if width > 0 && height > 0 {
+            if let Some(renderer) = &mut self.renderer {
+                renderer.resize(width, height);
+            }
+            self.ui.resize(width, height);
         }
-        self.ui.resize(width, height);
     }
 
     pub fn save(&self) {
@@ -252,81 +186,105 @@ impl Game {
     }
 }
 
-// Android entry point
+// ============= ANDROID ENTRY POINT =============
 #[cfg(target_os = "android")]
-use winit::platform::android::activity::AndroidApp;
+use android_activity::{AndroidApp, MainEvent, PollEvent};
 
 #[cfg(target_os = "android")]
 #[no_mangle]
 fn android_main(app: AndroidApp) {
+    use std::time::Instant;
+    
+    // Initialize logging first
+    android_logger::init_once(
+        android_logger::Config::default()
+            .with_max_level(log::LevelFilter::Debug)
+            .with_tag("VoxelCraft"),
+    );
+    
+    log::info!("=== VoxelCraft Starting ===");
+    
+    // Use simple polling loop instead of winit
+    let mut game: Option<Game> = None;
+    let mut window: Option<Arc<Window>> = None;
+    let mut last_time = Instant::now();
+    let mut running = true;
+    
+    // Try using winit with proper error handling
+    match run_with_winit(app.clone()) {
+        Ok(()) => {
+            log::info!("Game exited normally");
+        }
+        Err(e) => {
+            log::error!("Winit failed: {}, trying fallback", e);
+            // Fallback: simple loop
+            run_simple_loop(app);
+        }
+    }
+}
+
+#[cfg(target_os = "android")]
+fn run_with_winit(app: AndroidApp) -> Result<(), String> {
     use winit::event_loop::EventLoopBuilder;
     use winit::platform::android::EventLoopBuilderExtAndroid;
     
-    android_logger::init_once(
-        android_logger::Config::default()
-            .with_max_level(log::LevelFilter::Info),
-    );
-    
-    log::info!("VoxelCraft starting...");
+    log::info!("Creating event loop with winit...");
     
     let event_loop = EventLoopBuilder::new()
         .with_android_app(app)
         .build()
-        .expect("Failed to create event loop");
+        .map_err(|e| format!("Failed to create event loop: {}", e))?;
     
-    run_game_loop(event_loop);
-}
-
-#[cfg(not(target_os = "android"))]
-pub fn run_game() {
-    let event_loop = EventLoop::new().unwrap();
-    run_game_loop(event_loop);
-}
-
-fn run_game_loop(event_loop: EventLoop<()>) {
+    log::info!("Event loop created, starting game loop...");
+    
     let mut game: Option<Game> = None;
     let mut window: Option<Arc<Window>> = None;
     let mut last_time = std::time::Instant::now();
 
-    let _ = event_loop.run(move |event, target| {
+    event_loop.run(move |event, target| {
         target.set_control_flow(ControlFlow::Poll);
 
         match event {
             Event::Resumed => {
-                log::info!("App resumed, creating window...");
+                log::info!("=== RESUMED ===");
                 
-                // Create window on resume
-                let new_window = WindowBuilder::new()
-                    .with_title("VoxelCraft")
-                    .build(target)
-                    .expect("Failed to create window");
-                
-                let new_window = Arc::new(new_window);
-                
-                // Initialize game if not already
-                if game.is_none() {
-                    log::info!("Initializing game...");
-                    let mut new_game = Game::new(rand::random());
-                    new_game.init_renderer(new_window.clone());
-                    let _ = new_game.load();
-                    game = Some(new_game);
-                    log::info!("Game initialized!");
-                } else if let Some(ref mut g) = game {
-                    // Reinitialize renderer on resume
-                    g.init_renderer(new_window.clone());
+                if window.is_none() {
+                    log::info!("Creating window...");
+                    match WindowBuilder::new()
+                        .with_title("VoxelCraft")
+                        .build(target) 
+                    {
+                        Ok(w) => {
+                            log::info!("Window created successfully");
+                            let w = Arc::new(w);
+                            
+                            if game.is_none() {
+                                log::info!("Creating game...");
+                                let mut g = Game::new(12345);
+                                g.init_renderer(w.clone());
+                                let _ = g.load();
+                                game = Some(g);
+                            } else if let Some(ref mut g) = game {
+                                g.init_renderer(w.clone());
+                            }
+                            
+                            window = Some(w);
+                        }
+                        Err(e) => {
+                            log::error!("Failed to create window: {}", e);
+                        }
+                    }
                 }
-                
-                window = Some(new_window);
             }
             
             Event::Suspended => {
-                log::info!("App suspended, saving...");
+                log::info!("=== SUSPENDED ===");
                 if let Some(ref g) = game {
                     g.save();
                 }
-                // Drop renderer on suspend
                 if let Some(ref mut g) = game {
                     g.renderer = None;
+                    g.initialized = false;
                 }
                 window = None;
             }
@@ -334,6 +292,7 @@ fn run_game_loop(event_loop: EventLoop<()>) {
             Event::WindowEvent { event, .. } => {
                 match event {
                     WindowEvent::CloseRequested => {
+                        log::info!("Close requested");
                         if let Some(ref g) = game {
                             g.save();
                         }
@@ -341,10 +300,9 @@ fn run_game_loop(event_loop: EventLoop<()>) {
                     }
                     
                     WindowEvent::Resized(size) => {
+                        log::info!("Resized to {}x{}", size.width, size.height);
                         if let Some(ref mut g) = game {
-                            if size.width > 0 && size.height > 0 {
-                                g.resize(size.width, size.height);
-                            }
+                            g.resize(size.width, size.height);
                         }
                     }
                     
@@ -356,12 +314,14 @@ fn run_game_loop(event_loop: EventLoop<()>) {
                     
                     WindowEvent::RedrawRequested => {
                         let now = std::time::Instant::now();
-                        let dt = (now - last_time).as_secs_f32();
+                        let dt = (now - last_time).as_secs_f32().min(0.1);
                         last_time = now;
 
                         if let Some(ref mut g) = game {
-                            g.update(dt.min(0.1));
-                            g.render();
+                            if g.initialized {
+                                g.update(dt);
+                                g.render();
+                            }
                         }
                         
                         if let Some(ref w) = window {
@@ -377,6 +337,84 @@ fn run_game_loop(event_loop: EventLoop<()>) {
                 if let Some(ref w) = window {
                     w.request_redraw();
                 }
+            }
+            
+            _ => {}
+        }
+    }).map_err(|e| format!("Event loop error: {}", e))
+}
+
+#[cfg(target_os = "android")]
+fn run_simple_loop(app: AndroidApp) {
+    log::info!("Running simple fallback loop");
+    
+    loop {
+        app.poll_events(Some(std::time::Duration::from_millis(16)), |event| {
+            match event {
+                PollEvent::Main(MainEvent::Destroy) => {
+                    log::info!("App destroyed");
+                    std::process::exit(0);
+                }
+                _ => {}
+            }
+        });
+        
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+}
+
+// ============= DESKTOP ENTRY POINT =============
+#[cfg(not(target_os = "android"))]
+pub fn run_game() {
+    env_logger::init();
+    log::info!("Starting VoxelCraft (Desktop)");
+    
+    let event_loop = EventLoop::new().unwrap();
+    
+    let window = WindowBuilder::new()
+        .with_title("VoxelCraft")
+        .with_inner_size(winit::dpi::LogicalSize::new(1280, 720))
+        .build(&event_loop)
+        .unwrap();
+
+    let window = Arc::new(window);
+    
+    let mut game = Game::new(rand::random());
+    game.init_renderer(window.clone());
+    game.load();
+
+    let mut last_time = std::time::Instant::now();
+
+    let _ = event_loop.run(move |event, target| {
+        target.set_control_flow(ControlFlow::Poll);
+
+        match event {
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::CloseRequested => {
+                    game.save();
+                    target.exit();
+                }
+                
+                WindowEvent::Resized(size) => {
+                    game.resize(size.width, size.height);
+                }
+                
+                WindowEvent::RedrawRequested => {
+                    let now = std::time::Instant::now();
+                    let dt = (now - last_time).as_secs_f32();
+                    last_time = now;
+
+                    game.update(dt.min(0.1));
+                    game.render();
+                    
+                    window.request_redraw();
+                }
+                
+                _ => {}
+            },
+            
+            Event::AboutToWait => {
+                window.request_redraw();
             }
             
             _ => {}
