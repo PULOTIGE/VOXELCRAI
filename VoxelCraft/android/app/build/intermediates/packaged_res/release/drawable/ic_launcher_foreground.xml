@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Background square -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M0,0h108v108H0z"/>
+    
+    <!-- Voxel cube - top face -->
+    <path
+        android:fillColor="#81C784"
+        android:pathData="M54,30L78,42L54,54L30,42z"/>
+    
+    <!-- Voxel cube - left face -->
+    <path
+        android:fillColor="#388E3C"
+        android:pathData="M30,42L54,54L54,78L30,66z"/>
+    
+    <!-- Voxel cube - right face -->
+    <path
+        android:fillColor="#2E7D32"
+        android:pathData="M54,54L78,42L78,66L54,78z"/>
+    
+    <!-- Pickaxe handle -->
+    <path
+        android:strokeColor="#8D6E63"
+        android:strokeWidth="4"
+        android:pathData="M62,50L82,70"/>
+    
+    <!-- Pickaxe head -->
+    <path
+        android:fillColor="#78909C"
+        android:pathData="M76,58L88,52L90,56L82,68L78,70L74,64z"/>
+    
+</vector>

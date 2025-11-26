@@ -1,0 +1,1 @@
+/workspace/VoxelCraft/android/app/build/intermediates/merged_res/release/values_values.arsc.flat 

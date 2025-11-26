@@ -1,0 +1,7 @@
+com.voxelcraft.game.app-pngs-0 /workspace/VoxelCraft/android/app/build/generated/res/pngs/release
+com.voxelcraft.game.app-resValues-1 /workspace/VoxelCraft/android/app/build/generated/res/resValues/release
+com.voxelcraft.game.app-packageReleaseResources-2 /workspace/VoxelCraft/android/app/build/intermediates/incremental/release/packageReleaseResources/merged.dir
+com.voxelcraft.game.app-packageReleaseResources-3 /workspace/VoxelCraft/android/app/build/intermediates/incremental/release/packageReleaseResources/stripped.dir
+com.voxelcraft.game.app-merged_res-4 /workspace/VoxelCraft/android/app/build/intermediates/merged_res/release
+com.voxelcraft.game.app-main-5 /workspace/VoxelCraft/android/app/src/main/res
+com.voxelcraft.game.app-release-6 /workspace/VoxelCraft/android/app/src/release/res

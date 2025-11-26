@@ -246,9 +246,10 @@ impl Game {
 
 #[cfg(target_os = "android")]
 #[no_mangle]
-fn android_main(app: ndk_glue::AndroidApp) {
+fn android_main(_app: winit::platform::android::activity::AndroidApp) {
     android_logger::init_once(
-        android_logger::Config::default().with_min_level(log::Level::Info),
+        android_logger::Config::default()
+            .with_max_level(log::LevelFilter::Info),
     );
     
     log::info!("VoxelCraft starting...");
