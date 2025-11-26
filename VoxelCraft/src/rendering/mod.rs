@@ -1,12 +1,16 @@
 // VoxelCraft - Rendering System with Pattern Lighting
 
+mod loading;
+
 use crate::{GameState, GameUI};
-use crate::world::{Chunk, ChunkMesh, ChunkMesher, CHUNK_SIZE};
+use crate::world::{ChunkMesh, ChunkMesher, CHUNK_SIZE};
 use std::sync::Arc;
 use std::collections::HashMap;
 use wgpu::util::DeviceExt;
 use glam::{Vec3, Mat4};
 use winit::window::Window;
+
+use loading::LoadingScreen;
 
 /// Main renderer
 pub struct Renderer {
@@ -20,8 +24,6 @@ pub struct Renderer {
     // Pipelines
     terrain_pipeline: wgpu::RenderPipeline,
     water_pipeline: wgpu::RenderPipeline,
-    sky_pipeline: wgpu::RenderPipeline,
-    ui_pipeline: wgpu::RenderPipeline,
     
     // Camera
     pub camera: Camera,
@@ -37,6 +39,11 @@ pub struct Renderer {
     
     // Time for animations
     time: f32,
+    
+    // Loading screen
+    loading_screen: LoadingScreen,
+    show_loading: bool,
+    loading_time: f32,
 }
 
 struct ChunkRenderData {
@@ -51,19 +58,20 @@ struct ChunkRenderData {
 impl Renderer {
     pub async fn try_new(window: Arc<Window>) -> Result<Self, String> {
         let size = window.inner_size();
-        let width = size.width.max(1);
-        let height = size.height.max(1);
+        let width = size.width.max(100);
+        let height = size.height.max(100);
 
+        log::info!("Renderer: window size {}x{}", width, height);
+
+        // Create instance - try Vulkan first, then GL
         log::info!("Creating wgpu instance...");
-
-        // Create instance and surface
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::VULKAN | wgpu::Backends::GL,
             ..Default::default()
         });
 
         log::info!("Creating surface...");
-        let surface = instance.create_surface(window)
+        let surface = instance.create_surface(window.clone())
             .map_err(|e| format!("Failed to create surface: {}", e))?;
 
         log::info!("Requesting adapter...");
@@ -76,7 +84,8 @@ impl Renderer {
             .await
             .ok_or("No suitable GPU adapter found")?;
 
-        log::info!("Adapter: {:?}", adapter.get_info());
+        let info = adapter.get_info();
+        log::info!("Adapter: {} ({:?})", info.name, info.backend);
 
         log::info!("Requesting device...");
         let (device, queue) = adapter
@@ -84,26 +93,30 @@ impl Renderer {
                 &wgpu::DeviceDescriptor {
                     required_features: wgpu::Features::empty(),
                     required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
-                    label: None,
+                    label: Some("VoxelCraft Device"),
                 },
                 None,
             )
             .await
             .map_err(|e| format!("Failed to create device: {}", e))?;
 
-        log::info!("Device created successfully");
-
+        log::info!("Configuring surface...");
         let surface_caps = surface.get_capabilities(&adapter);
-        let surface_format = surface_caps.formats.first()
+        log::info!("Available formats: {:?}", surface_caps.formats);
+        
+        let surface_format = surface_caps.formats.iter()
+            .find(|f| f.is_srgb())
             .copied()
-            .ok_or("No surface formats available")?;
+            .unwrap_or(surface_caps.formats[0]);
+        
+        log::info!("Using format: {:?}", surface_format);
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
             width,
             height,
-            present_mode: wgpu::PresentMode::AutoVsync,
+            present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
@@ -114,24 +127,15 @@ impl Renderer {
         let (depth_texture, depth_view) = Self::create_depth_texture(&device, width, height);
 
         // Shaders
+        log::info!("Creating shaders...");
         let terrain_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Terrain Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../assets/shaders/terrain.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(TERRAIN_SHADER.into()),
         });
 
         let water_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Water Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../assets/shaders/water.wgsl").into()),
-        });
-
-        let sky_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Sky Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../assets/shaders/sky.wgsl").into()),
-        });
-
-        let ui_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("UI Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../assets/shaders/ui.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(WATER_SHADER.into()),
         });
 
         // Camera uniform
@@ -180,7 +184,7 @@ impl Renderer {
             label: Some("Light Bind Group Layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -199,17 +203,17 @@ impl Renderer {
             }],
         });
 
-        // Pipeline layouts
-        let terrain_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Terrain Pipeline Layout"),
+        // Pipeline layout
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Pipeline Layout"),
             bind_group_layouts: &[&camera_bind_group_layout, &light_bind_group_layout],
             push_constant_ranges: &[],
         });
 
-        // Terrain pipeline
+        log::info!("Creating terrain pipeline...");
         let terrain_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Terrain Pipeline"),
-            layout: Some(&terrain_pipeline_layout),
+            layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &terrain_shader,
                 entry_point: "vs_main",
@@ -240,10 +244,10 @@ impl Renderer {
             multiview: None,
         });
 
-        // Water pipeline (with alpha blending)
+        log::info!("Creating water pipeline...");
         let water_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Water Pipeline"),
-            layout: Some(&terrain_pipeline_layout),
+            layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &water_shader,
                 entry_point: "vs_main",
@@ -274,65 +278,8 @@ impl Renderer {
             multiview: None,
         });
 
-        // Sky pipeline
-        let sky_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Sky Pipeline Layout"),
-            bind_group_layouts: &[&camera_bind_group_layout, &light_bind_group_layout],
-            push_constant_ranges: &[],
-        });
-
-        let sky_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Sky Pipeline"),
-            layout: Some(&sky_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &sky_shader,
-                entry_point: "vs_main",
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &sky_shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    blend: None,
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-        });
-
-        // UI pipeline
-        let ui_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("UI Pipeline Layout"),
-            bind_group_layouts: &[],
-            push_constant_ranges: &[],
-        });
-
-        let ui_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("UI Pipeline"),
-            layout: Some(&ui_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &ui_shader,
-                entry_point: "vs_main",
-                buffers: &[UIVertex::desc()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &ui_shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-        });
+        log::info!("Creating loading screen...");
+        let loading_screen = LoadingScreen::new(&device, surface_format);
 
         log::info!("Renderer created successfully!");
         
@@ -345,8 +292,6 @@ impl Renderer {
             depth_view,
             terrain_pipeline,
             water_pipeline,
-            sky_pipeline,
-            ui_pipeline,
             camera,
             camera_buffer,
             camera_bind_group,
@@ -354,6 +299,9 @@ impl Renderer {
             light_bind_group,
             chunk_meshes: HashMap::new(),
             time: 0.0,
+            loading_screen,
+            show_loading: true,
+            loading_time: 0.0,
         })
     }
 
@@ -377,6 +325,8 @@ impl Renderer {
             return;
         }
 
+        log::info!("Resizing to {}x{}", width, height);
+
         self.config.width = width;
         self.config.height = height;
         self.surface.configure(&self.device, &self.config);
@@ -388,8 +338,38 @@ impl Renderer {
         self.camera.resize(width as f32, height as f32);
     }
 
-    pub fn render(&mut self, state: &GameState, ui: &GameUI) {
+    pub fn render(&mut self, state: &GameState, _ui: &GameUI) {
         self.time += 0.016;
+        self.loading_time += 0.016;
+
+        // Get surface texture
+        let output = match self.surface.get_current_texture() {
+            Ok(t) => t,
+            Err(e) => {
+                log::warn!("Failed to get surface texture: {:?}", e);
+                self.surface.configure(&self.device, &self.config);
+                return;
+            }
+        };
+        
+        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Render Encoder"),
+        });
+
+        // Show loading screen for first 4 seconds
+        if self.show_loading {
+            self.loading_screen.render(&mut encoder, &view, &self.queue, self.loading_time);
+            
+            if self.loading_time > 4.0 {
+                self.show_loading = false;
+            }
+            
+            self.queue.submit(std::iter::once(encoder.finish()));
+            output.present();
+            return;
+        }
 
         // Update camera
         self.camera.position = state.player.get_eye_position();
@@ -412,31 +392,22 @@ impl Renderer {
         // Update chunk meshes
         self.update_chunk_meshes(state);
 
-        // Get surface texture
-        let output = match self.surface.get_current_texture() {
-            Ok(t) => t,
-            Err(_) => return,
-        };
-        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Render Encoder"),
-        });
-
         // Render pass
         {
+            // Sky color based on time of day
+            let sky_color = if state.is_night() {
+                wgpu::Color { r: 0.02, g: 0.02, b: 0.08, a: 1.0 }
+            } else {
+                wgpu::Color { r: 0.4, g: 0.6, b: 0.9, a: 1.0 }
+            };
+
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Main Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.5,
-                            g: 0.7,
-                            b: 1.0,
-                            a: 1.0,
-                        }),
+                        load: wgpu::LoadOp::Clear(sky_color),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -489,7 +460,6 @@ impl Renderer {
         // Update dirty chunks
         for ((cx, cz), chunk) in &state.world.chunks {
             if chunk.dirty || !self.chunk_meshes.contains_key(&(*cx, *cz)) {
-                // Get neighbor chunks for seamless meshing
                 let neighbors = [
                     state.world.chunks.get(&(cx - 1, *cz)),
                     state.world.chunks.get(&(cx + 1, *cz)),
@@ -500,7 +470,6 @@ impl Renderer {
                 let mesh = ChunkMesher::generate_mesh(chunk, &neighbors);
 
                 if !mesh.is_empty() {
-                    // Convert ChunkVertex to TerrainVertex
                     let terrain_vertices: Vec<TerrainVertex> = mesh.vertices.iter().map(|v| {
                         TerrainVertex {
                             position: v.position,
@@ -576,18 +545,18 @@ pub struct Camera {
 impl Camera {
     pub fn new(width: f32, height: f32) -> Self {
         Self {
-            position: Vec3::ZERO,
+            position: Vec3::new(0.0, 64.0, 0.0),
             yaw: 0.0,
             pitch: 0.0,
             fov: 70.0_f32.to_radians(),
             aspect: width / height,
             near: 0.1,
-            far: 500.0,
+            far: 300.0,
         }
     }
 
     pub fn resize(&mut self, width: f32, height: f32) {
-        self.aspect = width / height;
+        self.aspect = width / height.max(1.0);
     }
 
     pub fn view_matrix(&self) -> Mat4 {
@@ -639,7 +608,7 @@ impl Default for LightUniform {
         Self {
             sun_direction: [0.5, 0.8, 0.3],
             _padding1: 0.0,
-            ambient: 0.3,
+            ambient: 0.4,
             time: 0.0,
             _padding2: [0.0; 2],
         }
@@ -686,36 +655,215 @@ impl TerrainVertex {
     }
 }
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct UIVertex {
-    position: [f32; 2],
-    uv: [f32; 2],
-    color: [f32; 4],
+// ============== EMBEDDED SHADERS ==============
+
+const TERRAIN_SHADER: &str = r#"
+struct CameraUniform {
+    view_proj: mat4x4<f32>,
+    position: vec3<f32>,
+    _padding: f32,
 }
 
-impl UIVertex {
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x2,
-                },
-                wgpu::VertexAttribute {
-                    offset: 8,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x2,
-                },
-                wgpu::VertexAttribute {
-                    offset: 16,
-                    shader_location: 2,
-                    format: wgpu::VertexFormat::Float32x4,
-                },
-            ],
-        }
-    }
+struct LightUniform {
+    sun_direction: vec3<f32>,
+    _padding1: f32,
+    ambient: f32,
+    time: f32,
+    _padding2: vec2<f32>,
 }
+
+@group(0) @binding(0) var<uniform> camera: CameraUniform;
+@group(1) @binding(0) var<uniform> light: LightUniform;
+
+struct VertexInput {
+    @location(0) position: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
+    @location(3) ao: f32,
+}
+
+struct VertexOutput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) world_pos: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
+    @location(3) ao: f32,
+}
+
+@vertex
+fn vs_main(in: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
+    out.world_pos = in.position;
+    out.clip_position = camera.view_proj * vec4<f32>(in.position, 1.0);
+    out.normal = in.normal;
+    out.uv = in.uv;
+    out.ao = in.ao;
+    return out;
+}
+
+fn get_block_color(uv: vec2<f32>, world_pos: vec3<f32>) -> vec3<f32> {
+    let atlas_pos = floor(uv * 16.0);
+    let noise = fract(sin(dot(world_pos.xz, vec2<f32>(12.9898, 78.233))) * 43758.5453);
+    
+    // Grass top
+    if atlas_pos.x == 0.0 && atlas_pos.y == 0.0 {
+        return mix(vec3<f32>(0.2, 0.6, 0.15), vec3<f32>(0.3, 0.7, 0.2), noise);
+    }
+    // Stone
+    if atlas_pos.x == 1.0 && atlas_pos.y == 0.0 {
+        return mix(vec3<f32>(0.4, 0.4, 0.4), vec3<f32>(0.55, 0.55, 0.55), noise);
+    }
+    // Dirt
+    if atlas_pos.x == 2.0 && atlas_pos.y == 0.0 {
+        return mix(vec3<f32>(0.45, 0.3, 0.15), vec3<f32>(0.55, 0.35, 0.2), noise);
+    }
+    // Grass side  
+    if atlas_pos.x == 3.0 && atlas_pos.y == 0.0 {
+        let grass_blend = smoothstep(0.3, 0.7, fract(uv.y * 16.0));
+        let dirt = mix(vec3<f32>(0.45, 0.3, 0.15), vec3<f32>(0.55, 0.35, 0.2), noise);
+        let grass = vec3<f32>(0.25, 0.55, 0.15);
+        return mix(dirt, grass, grass_blend);
+    }
+    // Wood
+    if atlas_pos.x == 4.0 && atlas_pos.y == 1.0 {
+        let ring = sin(world_pos.y * 8.0) * 0.1;
+        return vec3<f32>(0.5 + ring, 0.35 + ring * 0.5, 0.2);
+    }
+    // Sand
+    if atlas_pos.x == 2.0 && atlas_pos.y == 1.0 {
+        return mix(vec3<f32>(0.85, 0.8, 0.55), vec3<f32>(0.92, 0.88, 0.65), noise);
+    }
+    // Leaves
+    if atlas_pos.x == 4.0 && atlas_pos.y == 3.0 {
+        return mix(vec3<f32>(0.15, 0.45, 0.1), vec3<f32>(0.2, 0.55, 0.15), noise);
+    }
+    // Cobblestone
+    if atlas_pos.x == 0.0 && atlas_pos.y == 1.0 {
+        return mix(vec3<f32>(0.35, 0.35, 0.35), vec3<f32>(0.5, 0.5, 0.5), noise);
+    }
+    // Coal ore
+    if atlas_pos.x == 2.0 && atlas_pos.y == 2.0 {
+        let ore = step(0.7, noise);
+        return mix(vec3<f32>(0.45, 0.45, 0.45), vec3<f32>(0.1, 0.1, 0.1), ore);
+    }
+    // Iron ore
+    if atlas_pos.x == 1.0 && atlas_pos.y == 2.0 {
+        let ore = step(0.75, noise);
+        return mix(vec3<f32>(0.45, 0.45, 0.45), vec3<f32>(0.7, 0.6, 0.5), ore);
+    }
+    // Diamond ore
+    if atlas_pos.x == 2.0 && atlas_pos.y == 3.0 {
+        let sparkle = sin(light.time * 5.0 + world_pos.x * 10.0) * 0.5 + 0.5;
+        let ore = step(0.8, noise);
+        return mix(vec3<f32>(0.45, 0.45, 0.45), vec3<f32>(0.3, 0.8, 0.9) * (1.0 + sparkle * 0.3), ore);
+    }
+    // Snow
+    if atlas_pos.x == 2.0 && atlas_pos.y == 4.0 {
+        return vec3<f32>(0.95, 0.97, 1.0);
+    }
+    // Planks
+    if atlas_pos.x == 4.0 && atlas_pos.y == 0.0 {
+        let grain = sin(world_pos.z * 15.0) * 0.05;
+        return vec3<f32>(0.65 + grain, 0.45 + grain * 0.5, 0.25);
+    }
+    
+    return vec3<f32>(0.5, 0.5, 0.5);
+}
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    let base_color = get_block_color(in.uv, in.world_pos);
+    
+    // Lighting
+    let ndotl = max(dot(in.normal, light.sun_direction), 0.0);
+    let diffuse = ndotl * 0.7;
+    
+    // Ambient occlusion
+    let ao = in.ao * in.ao;
+    
+    var final_color = base_color * (light.ambient + diffuse) * ao;
+    
+    // Fog
+    let dist = length(camera.position - in.world_pos);
+    let fog_factor = 1.0 - exp(-dist * 0.008);
+    let fog_color = vec3<f32>(0.5, 0.65, 0.85);
+    final_color = mix(final_color, fog_color, clamp(fog_factor, 0.0, 0.7));
+    
+    return vec4<f32>(final_color, 1.0);
+}
+"#;
+
+const WATER_SHADER: &str = r#"
+struct CameraUniform {
+    view_proj: mat4x4<f32>,
+    position: vec3<f32>,
+    _padding: f32,
+}
+
+struct LightUniform {
+    sun_direction: vec3<f32>,
+    _padding1: f32,
+    ambient: f32,
+    time: f32,
+    _padding2: vec2<f32>,
+}
+
+@group(0) @binding(0) var<uniform> camera: CameraUniform;
+@group(1) @binding(0) var<uniform> light: LightUniform;
+
+struct VertexInput {
+    @location(0) position: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
+    @location(3) ao: f32,
+}
+
+struct VertexOutput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) world_pos: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+}
+
+@vertex
+fn vs_main(in: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
+    
+    var pos = in.position;
+    
+    // Simple wave animation
+    let wave = sin(pos.x * 0.5 + light.time * 2.0) * cos(pos.z * 0.5 + light.time * 1.5) * 0.1;
+    pos.y += wave;
+    
+    out.world_pos = pos;
+    out.clip_position = camera.view_proj * vec4<f32>(pos, 1.0);
+    out.normal = vec3<f32>(0.0, 1.0, 0.0);
+    
+    return out;
+}
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    let view_dir = normalize(camera.position - in.world_pos);
+    
+    // Water color
+    let deep_color = vec3<f32>(0.05, 0.2, 0.35);
+    let shallow_color = vec3<f32>(0.1, 0.4, 0.5);
+    let water_color = mix(deep_color, shallow_color, 0.5);
+    
+    // Fresnel reflection
+    let fresnel = pow(1.0 - max(dot(view_dir, in.normal), 0.0), 3.0);
+    let sky_color = vec3<f32>(0.5, 0.7, 0.95);
+    
+    // Sun reflection
+    let reflect_dir = reflect(-view_dir, in.normal);
+    let sun_reflect = pow(max(dot(reflect_dir, light.sun_direction), 0.0), 128.0);
+    
+    var final_color = mix(water_color, sky_color, fresnel * 0.5);
+    final_color += vec3<f32>(1.0, 0.95, 0.8) * sun_reflect;
+    
+    // Lighting
+    final_color *= (light.ambient + 0.3);
+    
+    return vec4<f32>(final_color, 0.75);
+}
+"#;
