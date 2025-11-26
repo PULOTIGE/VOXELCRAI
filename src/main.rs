@@ -15,6 +15,8 @@ mod lighting;
 #[cfg(feature = "gui")]
 mod renderer;
 #[cfg(feature = "gui")]
+mod resources;
+#[cfg(feature = "gui")]
 mod ui;
 #[cfg(feature = "gui")]
 mod voxel;

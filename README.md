@@ -44,7 +44,22 @@ adaptive-entity-engine/
 
 ## Сборка
 
-### Windows (EXE)
+### Windows (МЕГА EXE - рекомендуется)
+
+**Linux/Mac:**
+```bash
+./scripts/build-mega-exe.sh
+```
+
+**Windows:**
+```cmd
+scripts\build-mega-exe.bat
+```
+
+Результирующий МЕГА EXE файл будет в `dist/windows/adaptive-entity-engine.exe` (80-150 МБ).
+Это standalone файл со всеми зависимостями, готовый к распространению!
+
+### Windows (обычная сборка)
 
 ```bash
 ./scripts/build-windows-exe.sh

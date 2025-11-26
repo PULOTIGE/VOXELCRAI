@@ -13,6 +13,8 @@ pub mod lighting;
 #[cfg(feature = "gui")]
 pub mod renderer;
 #[cfg(feature = "gui")]
+pub mod resources;
+#[cfg(feature = "gui")]
 pub mod ui;
 pub mod voxel;
 
