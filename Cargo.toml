@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 
 [features]
 default = ["gui", "all-integrations"]
-gui = ["eframe", "egui", "rfd", "chrono", "include_dir"]
+gui = ["eframe", "egui", "rfd", "chrono", "include_dir", "wgpu", "winit", "bytemuck", "pollster"]
 all-integrations = ["reqwest"]
 
 [profile.release]
@@ -26,11 +26,10 @@ strip = false
 
 [dependencies]
 # Graphics & Rendering (optional for GUI)
-# wgpu = "0.19"
-# bytemuck = "1.14"
-# raw-window-handle = "0.5"
-# winit = "0.28"
-# pollster = "0.3"
+wgpu = { version = "0.19", optional = true }
+winit = { version = "0.28", optional = true }
+bytemuck = { version = "1.14", optional = true }
+pollster = "0.3"
 env_logger = "0.11"
 
 # ECS

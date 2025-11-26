@@ -13,34 +13,76 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    permissions:
+      contents: write
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
     
     - name: Install Rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: stable
-        target: x86_64-pc-windows-msvc
-        override: true
+        targets: x86_64-pc-windows-msvc
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
     
     - name: Build Mega EXE
+      shell: pwsh
+      env:
+        RUSTFLAGS: -C target-feature=+crt-static
+        CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS: -C target-feature=+crt-static
       run: |
-        $env:RUSTFLAGS = "-C target-feature=+crt-static"
-        $env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS = "-C target-feature=+crt-static"
-        cargo build --release --target x86_64-pc-windows-msvc --features "gui,all-integrations" --bin adaptive-entity-engine
+        Write-Host "Building with features: gui,all-integrations"
+        cargo build --release --target x86_64-pc-windows-msvc --features "gui,all-integrations" --bin adaptive-entity-engine 2>&1 | Tee-Object -Variable buildOutput
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "Build failed!"
+          Write-Host $buildOutput
+          exit 1
+        }
     
     - name: Create dist directory
+      shell: pwsh
       run: |
-        New-Item -ItemType Directory -Force -Path dist\windows
+        New-Item -ItemType Directory -Force -Path dist\windows | Out-Null
     
     - name: Copy EXE
+      shell: pwsh
       run: |
-        Copy-Item target\x86_64-pc-windows-msvc\release\adaptive-entity-engine.exe dist\windows\
+        if (Test-Path "target\x86_64-pc-windows-msvc\release\adaptive-entity-engine.exe") {
+          Copy-Item target\x86_64-pc-windows-msvc\release\adaptive-entity-engine.exe dist\windows\ -Force
+          Write-Host "EXE copied successfully"
+          Get-Item dist\windows\adaptive-entity-engine.exe | Select-Object Name, Length
+        } else {
+          Write-Error "EXE file not found!"
+          exit 1
+        }
     
-    - name: Create README
+    - name: Verify EXE exists
+      shell: pwsh
       run: |
-        Copy-Item dist\windows\README.txt dist\windows\README.txt
+        if (-not (Test-Path "dist\windows\adaptive-entity-engine.exe")) {
+          Write-Error "EXE file was not copied!"
+          exit 1
+        }
+        $file = Get-Item "dist\windows\adaptive-entity-engine.exe"
+        Write-Host "EXE file size: $($file.Length) bytes"
+        if ($file.Length -lt 1000000) {
+          Write-Warning "EXE file seems too small, might be corrupted"
+        }
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -48,11 +90,19 @@ jobs:
         name: adaptive-entity-engine-exe
         path: dist/windows/adaptive-entity-engine.exe
         retention-days: 30
+        if-no-files-found: error
     
-    - name: Commit EXE to repository
+    - name: Commit and push EXE
+      shell: pwsh
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        
         git add dist/windows/adaptive-entity-engine.exe
-        git commit -m "Add built Mega EXE file" || exit 0
-        git push || exit 0
+        
+        if (git diff --staged --quiet) {
+          Write-Host "No changes to commit"
+        } else {
+          git commit -m "🤖 Auto-build: Add Mega EXE file [skip ci]"
+          git push
+        }
