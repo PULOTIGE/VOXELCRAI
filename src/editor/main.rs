@@ -24,7 +24,9 @@ use adaptive_entity_engine::editor::{
 use editor_renderer::EditorRenderer;
 
 fn main() {
-    env_logger::init();
+    // Initialize logging
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    
     println!("╔════════════════════════════════════════════════════════════╗");
     println!("║           🎮 VoxelForge - 3D Game Constructor 🎮           ║");
     println!("║                     Version 1.0.0                          ║");
@@ -35,39 +37,96 @@ fn main() {
     println!("║  • Configure gameplay settings                             ║");
     println!("║  • Export to standalone game                               ║");
     println!("╚════════════════════════════════════════════════════════════╝");
+    println!();
+    println!("Starting VoxelForge...");
     
-    let event_loop = EventLoop::new().expect("Failed to create event loop");
+    // Create event loop
+    let event_loop = match EventLoop::new() {
+        Ok(el) => el,
+        Err(e) => {
+            eprintln!("Failed to create event loop: {}", e);
+            println!("Press Enter to exit...");
+            let _ = std::io::stdin().read_line(&mut String::new());
+            return;
+        }
+    };
     
-    let window = Arc::new(WindowBuilder::new()
+    // Create window
+    println!("Creating window...");
+    let window = match WindowBuilder::new()
         .with_title("VoxelForge - 3D Game Constructor")
-        .with_inner_size(PhysicalSize::new(1600, 900))
+        .with_inner_size(PhysicalSize::new(1280, 720))
         .with_min_inner_size(PhysicalSize::new(800, 600))
-        .build(&event_loop)
-        .expect("Failed to create window"));
-
-    let mut app = App::new(window.clone());
+        .with_visible(true)
+        .build(&event_loop) 
+    {
+        Ok(w) => Arc::new(w),
+        Err(e) => {
+            eprintln!("Failed to create window: {}", e);
+            println!("Press Enter to exit...");
+            let _ = std::io::stdin().read_line(&mut String::new());
+            return;
+        }
+    };
     
-    event_loop.run(move |event, target| {
-        target.set_control_flow(ControlFlow::Poll);
+    println!("Initializing renderer...");
+    
+    // Create app with error handling
+    let mut app = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        App::new(window.clone())
+    })) {
+        Ok(app) => app,
+        Err(_) => {
+            eprintln!("Failed to initialize graphics. Make sure you have a compatible GPU.");
+            println!("Press Enter to exit...");
+            let _ = std::io::stdin().read_line(&mut String::new());
+            return;
+        }
+    };
+    
+    println!("VoxelForge ready!");
+    println!();
+    println!("Controls:");
+    println!("  Right-click + drag: Orbit camera");
+    println!("  Middle-click + drag: Pan camera");
+    println!("  Scroll: Zoom");
+    println!("  Q/W/E/R/T: Select/Move/Rotate/Scale/Place tools");
+    println!("  Ctrl+N: New project");
+    println!("  Ctrl+S: Save");
+    println!("  Ctrl+P: Play mode");
+    println!();
+    
+    // Run event loop
+    let _ = event_loop.run(move |event, target| {
+        // Use Wait for less CPU usage, request redraw when needed
+        target.set_control_flow(ControlFlow::Wait);
         
         match event {
             Event::WindowEvent { event, .. } => {
                 match event {
                     WindowEvent::CloseRequested => {
+                        println!("Closing VoxelForge...");
                         target.exit();
                     }
                     WindowEvent::Resized(size) => {
-                        app.resize(size.width, size.height);
+                        if size.width > 0 && size.height > 0 {
+                            app.resize(size.width, size.height);
+                        }
+                        window.request_redraw();
                     }
                     WindowEvent::RedrawRequested => {
                         app.update();
                         app.render();
+                        // Request next frame
+                        window.request_redraw();
                     }
                     WindowEvent::MouseInput { state, button, .. } => {
                         app.handle_mouse_button(button, state == ElementState::Pressed);
+                        window.request_redraw();
                     }
                     WindowEvent::CursorMoved { position, .. } => {
                         app.handle_mouse_move(position.x as f32, position.y as f32);
+                        window.request_redraw();
                     }
                     WindowEvent::MouseWheel { delta, .. } => {
                         let scroll = match delta {
@@ -75,19 +134,21 @@ fn main() {
                             MouseScrollDelta::PixelDelta(pos) => pos.y as f32 * 0.1,
                         };
                         app.handle_scroll(scroll);
+                        window.request_redraw();
                     }
                     WindowEvent::KeyboardInput { event, .. } => {
                         app.handle_keyboard(event);
+                        window.request_redraw();
                     }
                     _ => {}
                 }
             }
-            Event::AboutToWait => {
+            Event::Resumed => {
                 window.request_redraw();
             }
             _ => {}
         }
-    }).expect("Event loop error");
+    });
 }
 
 /// Main application
@@ -114,14 +175,28 @@ struct App {
 impl App {
     fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
-        let renderer = pollster::block_on(EditorRenderer::new(window.clone(), size.width, size.height));
+        
+        // Try to create renderer, may fail on systems without GPU
+        let renderer = match pollster::block_on(EditorRenderer::try_new(window.clone(), size.width, size.height)) {
+            Ok(r) => {
+                println!("Renderer initialized successfully!");
+                Some(r)
+            }
+            Err(e) => {
+                eprintln!("Warning: Could not initialize renderer: {}", e);
+                eprintln!("Running in fallback mode without 3D rendering.");
+                None
+            }
+        };
         
         let mut state = EditorState::new();
         state.viewport.resize(size.width as f32, size.height as f32);
+        // Create a default project automatically
+        state.new_project("MyGame", ProjectTemplate::Deathmatch);
         
         Self {
             window,
-            renderer: Some(renderer),
+            renderer,
             state,
             mouse_pos: Vec2::ZERO,
             last_mouse_pos: Vec2::ZERO,
@@ -490,13 +565,14 @@ mod editor_renderer {
     }
 
     impl EditorRenderer {
-        pub async fn new(window: Arc<Window>, width: u32, height: u32) -> Self {
+        pub async fn try_new(window: Arc<Window>, width: u32, height: u32) -> Result<Self, String> {
             let instance = Instance::new(InstanceDescriptor {
                 backends: Backends::all(),
                 ..Default::default()
             });
 
-            let surface = instance.create_surface(window).unwrap();
+            let surface = instance.create_surface(window)
+                .map_err(|e| format!("Failed to create surface: {}", e))?;
             
             let adapter = instance
                 .request_adapter(&RequestAdapterOptions {
@@ -505,7 +581,7 @@ mod editor_renderer {
                     force_fallback_adapter: false,
                 })
                 .await
-                .expect("Failed to find GPU adapter");
+                .ok_or_else(|| "Failed to find GPU adapter".to_string())?;
 
             let (device, queue) = adapter
                 .request_device(&DeviceDescriptor {
@@ -514,7 +590,7 @@ mod editor_renderer {
                     required_limits: Limits::default(),
                 }, None)
                 .await
-                .expect("Failed to create device");
+                .map_err(|e| format!("Failed to create device: {}", e))?;
 
             let surface_caps = surface.get_capabilities(&adapter);
             let surface_format = surface_caps.formats.iter()
@@ -728,7 +804,7 @@ mod editor_renderer {
                 usage: BufferUsages::VERTEX,
             });
 
-            Self {
+            Ok(Self {
                 device,
                 queue,
                 surface,
@@ -742,7 +818,7 @@ mod editor_renderer {
                 camera_bind_group,
                 grid_vertex_buffer,
                 grid_vertex_count,
-            }
+            })
         }
 
         pub fn resize(&mut self, width: u32, height: u32) {
