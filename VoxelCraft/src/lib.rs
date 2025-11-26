@@ -187,11 +187,8 @@ impl Game {
 
 // ============= ANDROID ENTRY POINT =============
 #[cfg(target_os = "android")]
-use android_activity::AndroidApp;
-
-#[cfg(target_os = "android")]
 #[no_mangle]
-fn android_main(app: AndroidApp) {
+fn android_main(app: winit::platform::android::activity::AndroidApp) {
     // Initialize logging first
     android_logger::init_once(
         android_logger::Config::default()
@@ -200,7 +197,7 @@ fn android_main(app: AndroidApp) {
     );
     
     log::info!("========================================");
-    log::info!("=== VoxelCraft v1.0.4 Starting ===");
+    log::info!("=== VoxelCraft v1.0.5 Starting ===");
     log::info!("========================================");
     
     if let Err(e) = run_with_winit(app) {
@@ -209,7 +206,7 @@ fn android_main(app: AndroidApp) {
 }
 
 #[cfg(target_os = "android")]
-fn run_with_winit(app: AndroidApp) -> Result<(), String> {
+fn run_with_winit(app: winit::platform::android::activity::AndroidApp) -> Result<(), String> {
     use winit::event_loop::EventLoopBuilder;
     use winit::platform::android::EventLoopBuilderExtAndroid;
     
