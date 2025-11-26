@@ -1,0 +1,46 @@
+{
+  "name": "com.adaptiveentity.patternlighting",
+  "version": "1.0.0",
+  "displayName": "Pattern Lighting System",
+  "description": "Advanced pattern-based lighting, shadows, water, and materials system for Unity 6. Based on Adaptive Entity Engine.",
+  "unity": "6000.0",
+  "unityRelease": "0f1",
+  "documentationUrl": "https://github.com/PULOTIGE/VOXELCRAI",
+  "changelogUrl": "https://github.com/PULOTIGE/VOXELCRAI/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/PULOTIGE/VOXELCRAI/blob/main/LICENSE",
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.0.0",
+    "com.unity.render-pipelines.core": "17.0.0"
+  },
+  "keywords": [
+    "lighting",
+    "shadows",
+    "water",
+    "materials",
+    "pbr",
+    "pattern",
+    "effects",
+    "rendering"
+  ],
+  "author": {
+    "name": "Adaptive Entity Engine Team",
+    "url": "https://github.com/PULOTIGE/VOXELCRAI"
+  },
+  "samples": [
+    {
+      "displayName": "Basic Setup",
+      "description": "Basic pattern lighting setup example",
+      "path": "Samples~/BasicSetup"
+    },
+    {
+      "displayName": "Water Demo",
+      "description": "Water shader and effects demonstration",
+      "path": "Samples~/WaterDemo"
+    },
+    {
+      "displayName": "Lighting Demo",
+      "description": "All pattern types showcase",
+      "path": "Samples~/LightingDemo"
+    }
+  ]
+}
