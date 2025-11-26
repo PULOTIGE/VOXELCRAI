@@ -1,0 +1,35 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0.0",
+	"FriendlyName": "Pattern Lighting System",
+	"Description": "Advanced pattern-based lighting, reflections, and shadows system for Unreal Engine 5. Based on Adaptive Entity Engine.",
+	"Category": "Rendering",
+	"CreatedBy": "Adaptive Entity Engine Team",
+	"CreatedByURL": "https://github.com/PULOTIGE/VOXELCRAI",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "PatternLighting",
+			"Type": "Runtime",
+			"LoadingPhase": "PostConfigInit"
+		},
+		{
+			"Name": "PatternLightingEditor",
+			"Type": "Editor",
+			"LoadingPhase": "PostEngineInit"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "Niagara",
+			"Enabled": true
+		}
+	]
+}

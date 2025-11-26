@@ -1,0 +1,193 @@
+// Pattern Lighting Material Functions for UE5
+// Copy this code into a Material Function in the UE5 Editor
+
+// ============================================================================
+// MF_EvaluatePattern - Evaluates light pattern value
+// ============================================================================
+// Inputs:
+//   - PatternType (Scalar): 0-12 pattern types
+//   - Time (Scalar): Current time
+//   - Speed (Scalar): Animation speed
+//   - WorldPosition (Vector3): For position-based patterns
+//
+// Output:
+//   - PatternValue (Scalar): 0-1 intensity
+
+// HLSL Custom Node Code:
+float EvaluatePattern(float PatternType, float Time, float Speed, float3 WorldPos)
+{
+    float T = Time * Speed;
+    float Value = 1.0;
+    
+    // 0: Steady
+    if (PatternType < 0.5)
+    {
+        Value = 1.0;
+    }
+    // 1: Pulse
+    else if (PatternType < 1.5)
+    {
+        Value = 0.5 + 0.5 * sin(T * 6.28318);
+    }
+    // 2: Flicker
+    else if (PatternType < 2.5)
+    {
+        Value = 0.7 + 0.3 * sin(T * 20.0) * sin(T * 7.3);
+    }
+    // 3: Strobe
+    else if (PatternType < 3.5)
+    {
+        Value = sin(T * 10.0) > 0.0 ? 1.0 : 0.0;
+    }
+    // 4: Candle
+    else if (PatternType < 4.5)
+    {
+        Value = 0.8 + 0.2 * sin(T * 12.0) * sin(T * 5.7) * sin(T * 3.1);
+    }
+    // 5: Fluorescent
+    else if (PatternType < 5.5)
+    {
+        float Startup = saturate(fmod(T, 5.0) / 2.0);
+        float Buzz = 0.05 * sin(T * 120.0);
+        Value = Startup + Buzz * Startup;
+    }
+    // 6: Lightning
+    else if (PatternType < 6.5)
+    {
+        Value = pow(max(0.0, sin(T * 0.5)), 20.0);
+    }
+    // 7: Fire
+    else if (PatternType < 7.5)
+    {
+        Value = 0.7 + 0.3 * sin(T * 8.0) * sin(T * 4.3) * sin(T * 2.1);
+    }
+    // 8: Alarm
+    else if (PatternType < 8.5)
+    {
+        Value = sin(T * 4.0) > 0.0 ? 1.0 : 0.2;
+    }
+    // 9: Underwater Caustics
+    else if (PatternType < 9.5)
+    {
+        float Caustic = sin(WorldPos.x * 0.01 + T) * sin(WorldPos.y * 0.01 + T * 0.7);
+        Value = 0.7 + 0.3 * Caustic;
+    }
+    // 10: Heartbeat
+    else if (PatternType < 10.5)
+    {
+        float Beat = pow(sin(T * 2.5), 12.0);
+        float Beat2 = pow(sin(T * 2.5 + 0.3), 12.0) * 0.5;
+        Value = max(Beat, Beat2);
+    }
+    // 11: Breathing
+    else if (PatternType < 11.5)
+    {
+        Value = 0.3 + 0.7 * (sin(T * 0.5) * 0.5 + 0.5);
+    }
+    
+    return saturate(Value);
+}
+
+return EvaluatePattern(PatternType, Time, Speed, WorldPosition);
+
+// ============================================================================
+// MF_PBRLighting - Full PBR lighting calculation
+// ============================================================================
+// HLSL Custom Node Code:
+float3 PBRLighting(
+    float3 Normal, 
+    float3 ViewDir, 
+    float3 LightDir, 
+    float3 LightColor, 
+    float3 Albedo,
+    float Roughness, 
+    float Metallic,
+    float AO)
+{
+    float3 H = normalize(ViewDir + LightDir);
+    
+    float NdotL = max(dot(Normal, LightDir), 0.0);
+    float NdotV = max(dot(Normal, ViewDir), 0.0);
+    float NdotH = max(dot(Normal, H), 0.0);
+    float VdotH = max(dot(ViewDir, H), 0.0);
+    
+    // F0 for dielectrics and metals
+    float3 F0 = lerp(0.04, Albedo, Metallic);
+    
+    // GGX Distribution
+    float a = Roughness * Roughness;
+    float a2 = a * a;
+    float denom = NdotH * NdotH * (a2 - 1.0) + 1.0;
+    float D = a2 / (3.14159 * denom * denom);
+    
+    // Schlick Fresnel
+    float3 F = F0 + (1.0 - F0) * pow(1.0 - VdotH, 5.0);
+    
+    // Smith Geometry
+    float k = (Roughness + 1.0) * (Roughness + 1.0) / 8.0;
+    float G1 = NdotV / (NdotV * (1.0 - k) + k);
+    float G2 = NdotL / (NdotL * (1.0 - k) + k);
+    float G = G1 * G2;
+    
+    // Specular BRDF
+    float3 Specular = (D * F * G) / (4.0 * NdotV * NdotL + 0.001);
+    
+    // Diffuse
+    float3 kD = (1.0 - F) * (1.0 - Metallic);
+    float3 Diffuse = kD * Albedo / 3.14159;
+    
+    // Combine
+    float3 Result = (Diffuse + Specular) * LightColor * NdotL;
+    Result *= AO;
+    
+    return Result;
+}
+
+return PBRLighting(Normal, ViewDir, LightDir, LightColor, Albedo, Roughness, Metallic, AO);
+
+// ============================================================================
+// MF_SSR - Screen-Space Reflections
+// ============================================================================
+// Note: This requires a post-process material setup
+
+// ============================================================================
+// MF_Fresnel - Enhanced Fresnel calculation
+// ============================================================================
+float EnhancedFresnel(float3 ViewDir, float3 Normal, float IOR, float Power)
+{
+    float F0 = pow((1.0 - IOR) / (1.0 + IOR), 2.0);
+    float CosTheta = saturate(dot(ViewDir, Normal));
+    return F0 + (1.0 - F0) * pow(1.0 - CosTheta, Power);
+}
+
+return EnhancedFresnel(ViewDir, Normal, IOR, Power);
+
+// ============================================================================
+// MF_ContactShadow - Contact shadow calculation
+// ============================================================================
+float ContactShadow(float3 WorldPos, float3 LightDir, float Length, int Steps)
+{
+    float Shadow = 1.0;
+    float StepSize = Length / (float)Steps;
+    
+    for (int i = 1; i <= Steps; i++)
+    {
+        float3 SamplePos = WorldPos + LightDir * StepSize * i;
+        // Would need scene depth sampling here
+        // This is a simplified version
+    }
+    
+    return Shadow;
+}
+
+// ============================================================================
+// MF_VolumetricScatter - Volumetric light scattering
+// ============================================================================
+float VolumetricScatter(float3 ViewDir, float3 LightDir, float Density, float Scatter)
+{
+    float VdotL = dot(ViewDir, LightDir);
+    float Phase = (1.0 - Scatter * Scatter) / (4.0 * 3.14159 * pow(1.0 + Scatter * Scatter - 2.0 * Scatter * VdotL, 1.5));
+    return Phase * Density;
+}
+
+return VolumetricScatter(ViewDir, LightDir, Density, Scatter);

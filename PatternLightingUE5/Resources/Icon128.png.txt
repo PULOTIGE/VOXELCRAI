@@ -1,0 +1,17 @@
+[Placeholder for 128x128 plugin icon]
+
+To create the icon:
+1. Create a 128x128 PNG image
+2. Design should include:
+   - A stylized light bulb or light source
+   - Pattern waves or pulse lines
+   - Orange/yellow glow effect
+   - Dark background for contrast
+
+Suggested design:
+- Center: Glowing light bulb silhouette
+- Around it: Concentric pulse waves
+- Colors: Orange (#FF8C00) to Yellow (#FFD700) gradient
+- Background: Dark blue (#1A1A2E) or transparent
+
+Save as: Icon128.png in Resources folder
