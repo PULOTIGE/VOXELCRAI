@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.voxelcraft.game.app-merged_res-4:/values_values.arsc.flat",
+            "outputFile": "com.pulotige.voxelcraft.app-merged_res-4:/values_values.arsc.flat",
             "map": [
                 {
                     "source": "/workspace/VoxelCraft/android/app/src/main/res/values/strings.xml",

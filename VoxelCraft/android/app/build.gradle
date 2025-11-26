@@ -3,18 +3,18 @@ plugins {
 }
 
 android {
-    namespace 'com.voxelcraft.game'
+    namespace 'com.pulotige.voxelcraft'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.voxelcraft.game"
-        minSdk 28
+        applicationId "com.pulotige.voxelcraft"
+        minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName "1.0.0"
+        versionCode 6
+        versionName "1.0.6"
         
         ndk {
-            abiFilters 'arm64-v8a', 'armeabi-v7a'
+            abiFilters 'arm64-v8a'
         }
     }
 
@@ -22,14 +22,17 @@ android {
         release {
             minifyEnabled false
         }
-        debug {
-            minifyEnabled false
-        }
     }
 
     sourceSets {
         main {
             jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+    
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 }

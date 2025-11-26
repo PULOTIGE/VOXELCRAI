@@ -1,11 +1,11 @@
 1<?xml version="1.0" encoding="utf-8"?>
 2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-3    package="com.voxelcraft.game"
-4    android:versionCode="1"
-5    android:versionName="1.0.0" >
+3    package="com.pulotige.voxelcraft"
+4    android:versionCode="6"
+5    android:versionName="1.0.6" >
 6
 7    <uses-sdk
-8        android:minSdkVersion="28"
+8        android:minSdkVersion="26"
 9        android:targetSdkVersion="34" />
 10
 11    <uses-permission android:name="android.permission.INTERNET" />

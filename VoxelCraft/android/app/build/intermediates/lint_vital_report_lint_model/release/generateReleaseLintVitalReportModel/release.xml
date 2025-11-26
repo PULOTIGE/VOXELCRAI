@@ -1,7 +1,7 @@
 <variant
     name="release"
-    package="com.voxelcraft.game"
-    minSdkVersion="28"
+    package="com.pulotige.voxelcraft"
+    minSdkVersion="26"
     targetSdkVersion="34"
     mergedManifest="build/intermediates/merged_manifest/release/AndroidManifest.xml"
     manifestMergeReport="build/outputs/logs/manifest-merger-release-report.txt"
@@ -23,7 +23,7 @@
   <artifact
       classOutputs="build/intermediates/javac/release/classes:build/intermediates/compile_and_runtime_not_namespaced_r_class_jar/release/R.jar"
       type="MAIN"
-      applicationId="com.voxelcraft.game"
+      applicationId="com.pulotige.voxelcraft"
       generatedSourceFolders="build/generated/ap_generated_sources/release/out"
       generatedResourceFolders="build/generated/res/resValues/release"
       desugaredMethodsFiles="/home/ubuntu/.gradle/caches/transforms-3/992f376f8883df9b97903cfc470a3b6d/transformed/D8BackportedDesugaredMethods.txt">
