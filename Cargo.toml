@@ -6,6 +6,10 @@ authors = ["Adaptive Entity Engine Team"]
 description = "High-performance voxel engine with ECS, Vulkan rendering, and adaptive evolution"
 license = "MIT OR Apache-2.0"
 
+[features]
+default = ["gui"]
+gui = ["eframe", "egui", "egui-wgpu", "rfd", "chrono"]
+
 [profile.release]
 opt-level = 3
 lto = true
@@ -27,9 +31,11 @@ bevy_ecs = "0.13"
 bevy_utils = "0.13"
 
 # UI (optional for GUI)
-# eframe = { version = "0.24", default-features = false, features = ["default_fonts", "glow"] }
-# egui = "0.24"
-# egui-wgpu = "0.24"
+eframe = { version = "0.24", default-features = false, features = ["default_fonts", "glow"], optional = true }
+egui = { version = "0.24", optional = true }
+egui-wgpu = { version = "0.24", optional = true }
+rfd = { version = "0.12", optional = true }
+chrono = { version = "0.4", optional = true }
 
 # Math & Utilities
 glam = "0.24"

@@ -1,9 +1,15 @@
 #[cfg(feature = "gui")]
 mod archguard;
 #[cfg(feature = "gui")]
+mod chat;
+#[cfg(feature = "gui")]
 mod ecs;
 #[cfg(feature = "gui")]
 mod evolution;
+#[cfg(feature = "gui")]
+mod integrations;
+#[cfg(feature = "gui")]
+mod learning;
 #[cfg(feature = "gui")]
 mod lighting;
 #[cfg(feature = "gui")]
