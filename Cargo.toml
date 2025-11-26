@@ -35,7 +35,7 @@ bevy_ecs = "0.13"
 bevy_utils = "0.13"
 
 # Math & Utilities
-glam = "0.24"
+glam = { version = "0.24", features = ["serde"] }
 nalgebra = "0.32"
 half = "2.3"
 num-traits = "0.2"
@@ -82,4 +82,9 @@ path = "src/test_components.rs"
 [[bin]]
 name = "voxelstrike"
 path = "src/game/main.rs"
+required-features = ["gui"]
+
+[[bin]]
+name = "voxelforge"
+path = "src/editor/main.rs"
 required-features = ["gui"]
