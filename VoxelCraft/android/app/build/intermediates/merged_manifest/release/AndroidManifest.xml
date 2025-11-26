@@ -10,16 +10,15 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- OpenGL ES 3.0 required -->
+    <!-- OpenGL ES 3.0 -->
     <uses-feature
         android:glEsVersion="0x00030000"
-        android:required="true" />
+        android:required="false" />
 
     <!-- Vulkan optional -->
     <uses-feature
         android:name="android.hardware.vulkan.level"
-        android:required="false"
-        android:version="0" />
+        android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -31,15 +30,14 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen" >
 
-        <!-- NativeActivity -->
+        <!-- GameActivity from android-activity crate -->
         <activity
             android:name="android.app.NativeActivity"
-            android:configChanges="orientation|keyboardHidden|screenSize|screenLayout|smallestScreenSize|uiMode"
+            android:configChanges="orientation|keyboardHidden|screenSize|screenLayout|smallestScreenSize|uiMode|density"
             android:exported="true"
+            android:hardwareAccelerated="true"
             android:launchMode="singleTask"
-            android:screenOrientation="landscape" >
-
-            <!-- Native library name without lib prefix and .so suffix -->
+            android:screenOrientation="userLandscape" >
             <meta-data
                 android:name="android.app.lib_name"
                 android:value="voxelcraft" />
