@@ -49,10 +49,10 @@ impl Renderer {
 
         log::info!("Renderer: Creating with size {}x{}", width, height);
 
-        // Step 1: Create instance
-        log::info!("Step 1: Creating wgpu instance...");
+        // Step 1: Create instance - GL only for better Android compatibility
+        log::info!("Step 1: Creating wgpu instance (GL backend)...");
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::VULKAN | wgpu::Backends::GL,
+            backends: wgpu::Backends::GL,
             ..Default::default()
         });
         log::info!("Instance created!");
