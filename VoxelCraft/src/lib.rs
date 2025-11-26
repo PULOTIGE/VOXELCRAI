@@ -1,5 +1,5 @@
 // VoxelCraft - Minecraft-like game for Android
-// Main library module
+// Simplified version for debugging
 
 pub mod world;
 pub mod player;
@@ -11,7 +11,7 @@ pub mod save;
 
 use std::sync::Arc;
 use winit::event::{Event, WindowEvent, Touch};
-use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event_loop::ControlFlow;
 use winit::window::{Window, WindowBuilder};
 
 pub use world::{World, Chunk, BlockType, Biome};
@@ -19,8 +19,11 @@ pub use player::{Player, Inventory, ItemStack};
 pub use crafting::{Recipe, CraftingSystem};
 pub use entities::{Entity, EntityType, Mob, MobAI};
 pub use ui::{GameUI, UIElement, TouchInput};
-pub use rendering::{Renderer, Camera};
+pub use rendering::Renderer;
 pub use save::{SaveSystem, WorldSave};
+
+// Re-export Camera if it exists
+pub use rendering::Camera;
 
 /// Game state
 pub struct GameState {
@@ -113,20 +116,16 @@ impl Game {
     pub fn init_renderer(&mut self, window: Arc<Window>) {
         log::info!("Initializing renderer...");
         
-        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            pollster::block_on(Renderer::try_new(window))
-        })) {
-            Ok(Ok(renderer)) => {
+        match pollster::block_on(async {
+            Renderer::try_new(window).await
+        }) {
+            Ok(renderer) => {
                 self.renderer = Some(renderer);
                 self.initialized = true;
                 log::info!("Renderer initialized successfully!");
             }
-            Ok(Err(e)) => {
-                log::error!("Failed to create renderer: {}", e);
-                self.initialized = false;
-            }
             Err(e) => {
-                log::error!("Renderer panicked: {:?}", e);
+                log::error!("Failed to create renderer: {}", e);
                 self.initialized = false;
             }
         }
@@ -188,13 +187,11 @@ impl Game {
 
 // ============= ANDROID ENTRY POINT =============
 #[cfg(target_os = "android")]
-use android_activity::{AndroidApp, MainEvent, PollEvent};
+use android_activity::AndroidApp;
 
 #[cfg(target_os = "android")]
 #[no_mangle]
 fn android_main(app: AndroidApp) {
-    use std::time::Instant;
-    
     // Initialize logging first
     android_logger::init_once(
         android_logger::Config::default()
@@ -202,24 +199,12 @@ fn android_main(app: AndroidApp) {
             .with_tag("VoxelCraft"),
     );
     
-    log::info!("=== VoxelCraft Starting ===");
+    log::info!("========================================");
+    log::info!("=== VoxelCraft v1.0.4 Starting ===");
+    log::info!("========================================");
     
-    // Use simple polling loop instead of winit
-    let mut game: Option<Game> = None;
-    let mut window: Option<Arc<Window>> = None;
-    let mut last_time = Instant::now();
-    let mut running = true;
-    
-    // Try using winit with proper error handling
-    match run_with_winit(app.clone()) {
-        Ok(()) => {
-            log::info!("Game exited normally");
-        }
-        Err(e) => {
-            log::error!("Winit failed: {}, trying fallback", e);
-            // Fallback: simple loop
-            run_simple_loop(app);
-        }
+    if let Err(e) = run_with_winit(app) {
+        log::error!("Game crashed: {}", e);
     }
 }
 
@@ -228,14 +213,14 @@ fn run_with_winit(app: AndroidApp) -> Result<(), String> {
     use winit::event_loop::EventLoopBuilder;
     use winit::platform::android::EventLoopBuilderExtAndroid;
     
-    log::info!("Creating event loop with winit...");
+    log::info!("Step 1: Creating event loop...");
     
     let event_loop = EventLoopBuilder::new()
         .with_android_app(app)
         .build()
-        .map_err(|e| format!("Failed to create event loop: {}", e))?;
+        .map_err(|e| format!("EventLoop error: {}", e))?;
     
-    log::info!("Event loop created, starting game loop...");
+    log::info!("Step 2: Event loop created!");
     
     let mut game: Option<Game> = None;
     let mut window: Option<Arc<Window>> = None;
@@ -246,25 +231,35 @@ fn run_with_winit(app: AndroidApp) -> Result<(), String> {
 
         match event {
             Event::Resumed => {
-                log::info!("=== RESUMED ===");
+                log::info!("=== RESUMED EVENT ===");
                 
                 if window.is_none() {
                     log::info!("Creating window...");
+                    
                     match WindowBuilder::new()
                         .with_title("VoxelCraft")
                         .build(target) 
                     {
                         Ok(w) => {
-                            log::info!("Window created successfully");
+                            let size = w.inner_size();
+                            log::info!("Window created: {}x{}", size.width, size.height);
                             let w = Arc::new(w);
                             
                             if game.is_none() {
-                                log::info!("Creating game...");
+                                log::info!("Creating game instance...");
                                 let mut g = Game::new(12345);
+                                log::info!("Initializing renderer...");
                                 g.init_renderer(w.clone());
-                                let _ = g.load();
+                                
+                                if g.initialized {
+                                    log::info!("Game fully initialized!");
+                                } else {
+                                    log::error!("Game initialization failed!");
+                                }
+                                
                                 game = Some(g);
                             } else if let Some(ref mut g) = game {
+                                log::info!("Re-initializing renderer...");
                                 g.init_renderer(w.clone());
                             }
                             
@@ -278,7 +273,7 @@ fn run_with_winit(app: AndroidApp) -> Result<(), String> {
             }
             
             Event::Suspended => {
-                log::info!("=== SUSPENDED ===");
+                log::info!("=== SUSPENDED EVENT ===");
                 if let Some(ref g) = game {
                     g.save();
                 }
@@ -344,28 +339,11 @@ fn run_with_winit(app: AndroidApp) -> Result<(), String> {
     }).map_err(|e| format!("Event loop error: {}", e))
 }
 
-#[cfg(target_os = "android")]
-fn run_simple_loop(app: AndroidApp) {
-    log::info!("Running simple fallback loop");
-    
-    loop {
-        app.poll_events(Some(std::time::Duration::from_millis(16)), |event| {
-            match event {
-                PollEvent::Main(MainEvent::Destroy) => {
-                    log::info!("App destroyed");
-                    std::process::exit(0);
-                }
-                _ => {}
-            }
-        });
-        
-        std::thread::sleep(std::time::Duration::from_millis(100));
-    }
-}
-
 // ============= DESKTOP ENTRY POINT =============
 #[cfg(not(target_os = "android"))]
 pub fn run_game() {
+    use winit::event_loop::EventLoop;
+    
     env_logger::init();
     log::info!("Starting VoxelCraft (Desktop)");
     
