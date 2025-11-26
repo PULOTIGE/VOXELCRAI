@@ -2,10 +2,13 @@ name: Build Mega EXE
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'cursor/**' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+  schedule:
+    # Запуск каждый день в полночь UTC для проверки
+    - cron: '0 0 * * *'
 
 jobs:
   build-windows:
