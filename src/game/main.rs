@@ -150,8 +150,8 @@ impl GameState {
             }
         }
         
-        // Update HUD
-        self.hud.update(current_time);
+        // Update HUD with delta_time for FPS counter
+        self.hud.update(current_time, delta_time);
         
         // Check win condition (all enemies dead)
         if self.enemies.get_alive_enemies().is_empty() {

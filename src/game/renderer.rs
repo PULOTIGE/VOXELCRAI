@@ -93,15 +93,25 @@ impl GameRenderer {
             .find(|f| f.is_srgb())
             .unwrap_or(surface_caps.formats[0]);
         
+        // Use Immediate mode for unlimited FPS (no VSync)
+        // Fallback to Mailbox or Fifo if not available
+        let present_mode = if surface_caps.present_modes.contains(&PresentMode::Immediate) {
+            PresentMode::Immediate
+        } else if surface_caps.present_modes.contains(&PresentMode::Mailbox) {
+            PresentMode::Mailbox
+        } else {
+            PresentMode::Fifo // VSync fallback
+        };
+        
         let config = SurfaceConfiguration {
             usage: TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
             width: size.width.max(1),
             height: size.height.max(1),
-            present_mode: PresentMode::AutoVsync,
+            present_mode,
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
-            desired_maximum_frame_latency: 2,
+            desired_maximum_frame_latency: 1, // Lower latency
         };
         
         surface.configure(&device, &config);
@@ -553,12 +563,129 @@ impl GameRenderer {
             add_quad(elem.x, elem.y, elem.width, elem.height, elem.color);
         }
         
+        // Draw FPS
+        for elem in &hud_data.fps_elements {
+            add_quad(elem.x, elem.y, elem.width, elem.height, elem.color);
+        }
+        
+        // Draw round info
+        for elem in &hud_data.round_elements {
+            add_quad(elem.x, elem.y, elem.width, elem.height, elem.color);
+        }
+        
+        // Add FPS text as simple digits (top right)
+        if hud_data.fps > 0 {
+            let fps_str = format!("{}", hud_data.fps);
+            let digit_width = 12.0;
+            let digit_height = 20.0;
+            let start_x = w - 80.0;
+            let start_y = 15.0;
+            
+            for (i, c) in fps_str.chars().enumerate() {
+                if let Some(digit) = c.to_digit(10) {
+                    // Draw simple 7-segment style digit
+                    let x = start_x + i as f32 * (digit_width + 2.0);
+                    let segments = get_digit_segments(digit as u8);
+                    
+                    for (seg_x, seg_y, seg_w, seg_h) in segments {
+                        add_quad(
+                            x + seg_x * digit_width,
+                            start_y + seg_y * digit_height,
+                            seg_w * digit_width,
+                            seg_h * digit_height,
+                            [0.0, 1.0, 0.0, 1.0], // Green
+                        );
+                    }
+                }
+            }
+            
+            // FPS label
+            add_quad(w - 35.0, start_y + 2.0, 25.0, 16.0, [0.0, 0.8, 0.0, 0.8]);
+        }
+        
         vertices
     }
+}
+
+// Get 7-segment style representation for a digit
+fn get_digit_segments(digit: u8) -> Vec<(f32, f32, f32, f32)> {
+    // Returns (x, y, width, height) for each segment relative to digit size
+    let h = 0.08; // Horizontal segment height
+    let v = 0.15; // Vertical segment width
     
-    pub fn get_size(&self) -> (u32, u32) {
-        self.size
-    }
+    let segments = match digit {
+        0 => vec![
+            (0.1, 0.0, 0.8, h),     // Top
+            (0.0, 0.05, v, 0.4),    // Top-left
+            (0.85, 0.05, v, 0.4),   // Top-right
+            (0.0, 0.55, v, 0.4),    // Bottom-left
+            (0.85, 0.55, v, 0.4),   // Bottom-right
+            (0.1, 0.92, 0.8, h),    // Bottom
+        ],
+        1 => vec![
+            (0.85, 0.05, v, 0.4),   // Top-right
+            (0.85, 0.55, v, 0.4),   // Bottom-right
+        ],
+        2 => vec![
+            (0.1, 0.0, 0.8, h),     // Top
+            (0.85, 0.05, v, 0.4),   // Top-right
+            (0.1, 0.46, 0.8, h),    // Middle
+            (0.0, 0.55, v, 0.4),    // Bottom-left
+            (0.1, 0.92, 0.8, h),    // Bottom
+        ],
+        3 => vec![
+            (0.1, 0.0, 0.8, h),     // Top
+            (0.85, 0.05, v, 0.4),   // Top-right
+            (0.1, 0.46, 0.8, h),    // Middle
+            (0.85, 0.55, v, 0.4),   // Bottom-right
+            (0.1, 0.92, 0.8, h),    // Bottom
+        ],
+        4 => vec![
+            (0.0, 0.05, v, 0.4),    // Top-left
+            (0.85, 0.05, v, 0.4),   // Top-right
+            (0.1, 0.46, 0.8, h),    // Middle
+            (0.85, 0.55, v, 0.4),   // Bottom-right
+        ],
+        5 => vec![
+            (0.1, 0.0, 0.8, h),     // Top
+            (0.0, 0.05, v, 0.4),    // Top-left
+            (0.1, 0.46, 0.8, h),    // Middle
+            (0.85, 0.55, v, 0.4),   // Bottom-right
+            (0.1, 0.92, 0.8, h),    // Bottom
+        ],
+        6 => vec![
+            (0.1, 0.0, 0.8, h),     // Top
+            (0.0, 0.05, v, 0.4),    // Top-left
+            (0.1, 0.46, 0.8, h),    // Middle
+            (0.0, 0.55, v, 0.4),    // Bottom-left
+            (0.85, 0.55, v, 0.4),   // Bottom-right
+            (0.1, 0.92, 0.8, h),    // Bottom
+        ],
+        7 => vec![
+            (0.1, 0.0, 0.8, h),     // Top
+            (0.85, 0.05, v, 0.4),   // Top-right
+            (0.85, 0.55, v, 0.4),   // Bottom-right
+        ],
+        8 => vec![
+            (0.1, 0.0, 0.8, h),     // Top
+            (0.0, 0.05, v, 0.4),    // Top-left
+            (0.85, 0.05, v, 0.4),   // Top-right
+            (0.1, 0.46, 0.8, h),    // Middle
+            (0.0, 0.55, v, 0.4),    // Bottom-left
+            (0.85, 0.55, v, 0.4),   // Bottom-right
+            (0.1, 0.92, 0.8, h),    // Bottom
+        ],
+        9 => vec![
+            (0.1, 0.0, 0.8, h),     // Top
+            (0.0, 0.05, v, 0.4),    // Top-left
+            (0.85, 0.05, v, 0.4),   // Top-right
+            (0.1, 0.46, 0.8, h),    // Middle
+            (0.85, 0.55, v, 0.4),   // Bottom-right
+            (0.1, 0.92, 0.8, h),    // Bottom
+        ],
+        _ => vec![],
+    };
+    segments
 }
 
 fn generate_enemy_mesh(enemy: &Enemy) -> (Vec<Vertex>, Vec<u32>) {

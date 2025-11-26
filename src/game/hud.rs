@@ -1,7 +1,8 @@
-//! Game HUD - Health, Armor, Ammo, Crosshair, Kill feed
+//! Game HUD - Health, Armor, Ammo, Crosshair, Kill feed, FPS Counter
 
 use super::player::Player;
 use super::weapons::WeaponType;
+use std::collections::VecDeque;
 
 /// HUD element position/size data for rendering
 #[derive(Clone, Debug)]
@@ -28,6 +29,10 @@ pub struct GameHUD {
     pub screen_height: f32,
     pub kill_feed: Vec<KillFeedEntry>,
     pub show_scoreboard: bool,
+    // FPS counter
+    pub frame_times: VecDeque<f32>,
+    pub current_fps: f32,
+    pub show_fps: bool,
 }
 
 impl GameHUD {
@@ -37,6 +42,9 @@ impl GameHUD {
             screen_height: height,
             kill_feed: Vec::new(),
             show_scoreboard: false,
+            frame_times: VecDeque::with_capacity(60),
+            current_fps: 0.0,
+            show_fps: true,
         }
     }
 
@@ -60,9 +68,21 @@ impl GameHUD {
         }
     }
 
-    pub fn update(&mut self, current_time: f32) {
+    pub fn update(&mut self, current_time: f32, delta_time: f32) {
         // Remove old kill feed entries (older than 5 seconds)
         self.kill_feed.retain(|entry| current_time - entry.time < 5.0);
+        
+        // Update FPS counter
+        if delta_time > 0.0 {
+            self.frame_times.push_back(delta_time);
+            if self.frame_times.len() > 60 {
+                self.frame_times.pop_front();
+            }
+            
+            // Calculate average FPS
+            let avg_time: f32 = self.frame_times.iter().sum::<f32>() / self.frame_times.len() as f32;
+            self.current_fps = 1.0 / avg_time;
+        }
     }
 
     /// Generate HUD render data
@@ -197,6 +217,47 @@ impl GameHUD {
         // Kill feed
         data.kill_feed = self.kill_feed.clone();
 
+        // FPS Counter (top right)
+        if self.show_fps {
+            // FPS background
+            data.fps_elements.push(HudElement {
+                x: self.screen_width - 120.0,
+                y: 10.0,
+                width: 110.0,
+                height: 30.0,
+                color: [0.0, 0.0, 0.0, 0.6],
+            });
+            
+            // FPS value indicator (colored bar)
+            let fps_ratio = (self.current_fps / 144.0).min(1.0);
+            let fps_color = if self.current_fps >= 60.0 {
+                [0.0, 1.0, 0.0, 0.9]  // Green
+            } else if self.current_fps >= 30.0 {
+                [1.0, 1.0, 0.0, 0.9]  // Yellow
+            } else {
+                [1.0, 0.0, 0.0, 0.9]  // Red
+            };
+            
+            data.fps_elements.push(HudElement {
+                x: self.screen_width - 118.0,
+                y: 12.0,
+                width: 106.0 * fps_ratio,
+                height: 4.0,
+                color: fps_color,
+            });
+            
+            data.fps = self.current_fps as u32;
+        }
+
+        // Round/Score display (top center)
+        data.round_elements.push(HudElement {
+            x: self.screen_width / 2.0 - 60.0,
+            y: 10.0,
+            width: 120.0,
+            height: 35.0,
+            color: [0.0, 0.0, 0.0, 0.5],
+        });
+
         data
     }
 }
@@ -207,12 +268,15 @@ pub struct HudRenderData {
     pub health_elements: Vec<HudElement>,
     pub armor_elements: Vec<HudElement>,
     pub ammo_elements: Vec<HudElement>,
+    pub fps_elements: Vec<HudElement>,
+    pub round_elements: Vec<HudElement>,
     
     pub health: u32,
     pub armor: u32,
     pub money: u32,
     pub kills: u32,
     pub deaths: u32,
+    pub fps: u32,
     
     pub weapon_name: String,
     pub current_ammo: u32,
