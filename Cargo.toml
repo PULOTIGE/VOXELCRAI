@@ -3,7 +3,7 @@ name = "adaptive-entity-engine"
 version = "1.0.0"
 edition = "2021"
 authors = ["Adaptive Entity Engine Team"]
-description = "High-performance voxel engine with ECS, Vulkan rendering, and adaptive evolution"
+description = "High-performance voxel engine with ECS, Vulkan rendering, and adaptive evolution. Includes VoxelStrike - a CS-like FPS game!"
 license = "MIT OR Apache-2.0"
 
 [profile.release]
@@ -13,26 +13,29 @@ codegen-units = 1
 panic = "abort"
 strip = true
 
+[features]
+default = ["gui"]
+gui = ["wgpu", "winit", "pollster", "bytemuck", "eframe", "egui"]
+
 [dependencies]
-# Graphics & Rendering (optional for GUI)
-# wgpu = "0.19"
-# bytemuck = "1.14"
-# raw-window-handle = "0.5"
-# winit = "0.28"
-# pollster = "0.3"
+# Graphics & Rendering
+wgpu = { version = "0.19", optional = true }
+winit = { version = "0.29", optional = true }
+pollster = { version = "0.3", optional = true }
+bytemuck = { version = "1.14", features = ["derive"], optional = true }
 env_logger = "0.11"
+log = "0.4"
+
+# UI Framework
+eframe = { version = "0.27", default-features = false, features = ["default_fonts", "glow", "wgpu"], optional = true }
+egui = { version = "0.27", optional = true }
 
 # ECS
 bevy_ecs = "0.13"
 bevy_utils = "0.13"
 
-# UI (optional for GUI)
-# eframe = { version = "0.24", default-features = false, features = ["default_fonts", "glow"] }
-# egui = "0.24"
-# egui-wgpu = "0.24"
-
 # Math & Utilities
-glam = "0.24"
+glam = { version = "0.24", features = ["serde"] }
 nalgebra = "0.32"
 half = "2.3"
 num-traits = "0.2"
@@ -48,9 +51,6 @@ prometheus = "0.13"
 parking_lot = "0.12"
 dashmap = "5.5"
 
-# HIP/ROCm (optional, for AMD Vega 20 fallback)
-# rocm-smi = "0.1" # Uncomment if needed
-
 # Evolution & Genetics
 rand = "0.8"
 uuid = { version = "1.6", features = ["v4"] }
@@ -58,6 +58,9 @@ uuid = { version = "1.6", features = ["v4"] }
 # Compression & Storage
 flate2 = "1.0"
 bincode = "1.3"
+
+# Image processing for textures
+image = "0.24"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "libloaderapi"] }
@@ -75,3 +78,13 @@ path = "src/main.rs"
 [[bin]]
 name = "test-components"
 path = "src/test_components.rs"
+
+[[bin]]
+name = "voxelstrike"
+path = "src/game/main.rs"
+required-features = ["gui"]
+
+[[bin]]
+name = "voxelforge"
+path = "src/editor/main.rs"
+required-features = ["gui"]

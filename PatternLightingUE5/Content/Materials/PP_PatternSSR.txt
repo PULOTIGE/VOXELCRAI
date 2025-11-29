@@ -1,0 +1,101 @@
+// Screen-Space Reflections Post Process Material
+// For use in UE5 Post Process Materials
+// ============================================================================
+
+// Create a new Material with:
+// - Material Domain: Post Process
+// - Blendable Location: Before Tonemapping
+
+// ============================================================================
+// Custom HLSL Node: SSR_RayMarch
+// ============================================================================
+
+// Input: ScreenUV (float2), Normal (float3), MaxDistance (float), MaxSteps (int), Thickness (float)
+// Output: ReflectionColor (float3), Hit (float)
+
+float3 SSR_RayMarch(
+    float2 ScreenUV, 
+    float3 WorldNormal,
+    float3 ViewDir,
+    float MaxDistance,
+    int MaxSteps,
+    float Thickness,
+    float Roughness)
+{
+    // Reflect view direction
+    float3 ReflectDir = reflect(ViewDir, WorldNormal);
+    
+    // Start position
+    float3 StartPos = GetWorldPosition(ScreenUV);
+    
+    // Ray march
+    float StepSize = MaxDistance / (float)MaxSteps;
+    float3 CurrentPos = StartPos;
+    
+    for (int i = 0; i < MaxSteps; i++)
+    {
+        CurrentPos += ReflectDir * StepSize;
+        
+        // Project to screen
+        float4 ProjPos = mul(float4(CurrentPos, 1.0), View.ViewProjectionMatrix);
+        float2 SampleUV = ProjPos.xy / ProjPos.w * 0.5 + 0.5;
+        SampleUV.y = 1.0 - SampleUV.y;
+        
+        // Check bounds
+        if (SampleUV.x < 0.0 || SampleUV.x > 1.0 || SampleUV.y < 0.0 || SampleUV.y > 1.0)
+        {
+            break;
+        }
+        
+        // Sample depth
+        float SampledDepth = SceneTextureLookup(SampleUV, SceneTextureId_Depth, false).r;
+        float CurrentDepth = CurrentPos.z;
+        
+        // Check hit
+        if (abs(CurrentDepth - SampledDepth) < Thickness)
+        {
+            // Sample color
+            float3 Color = SceneTextureLookup(SampleUV, SceneTextureId_PostProcessInput0, false).rgb;
+            
+            // Fade based on distance and roughness
+            float DistanceFade = 1.0 - (float)i / (float)MaxSteps;
+            float RoughnessFade = 1.0 - Roughness * Roughness;
+            
+            return Color * DistanceFade * RoughnessFade;
+        }
+    }
+    
+    return float3(0, 0, 0);
+}
+
+// Usage in Material:
+// 1. Add Custom node with above code
+// 2. Connect Scene Texture: Post Process Input 0 for color
+// 3. Connect Scene Texture: Scene Depth for depth comparison
+// 4. Add Fresnel for edge falloff
+// 5. Blend with original scene color
+
+// ============================================================================
+// Material Setup Instructions:
+// ============================================================================
+/*
+1. Create new Material: M_PatternSSR
+2. Set Material Domain to Post Process
+3. Set Blendable Location to Before Tonemapping
+
+4. Add nodes:
+   - Scene Texture (Post Process Input 0) -> Original Color
+   - Scene Texture (World Normal) -> Normal input
+   - Camera Vector -> View direction
+   - Custom node with SSR code
+
+5. Parameters to expose:
+   - MaxDistance (default: 1000)
+   - MaxSteps (default: 64)
+   - Thickness (default: 1.0)
+   - Intensity (default: 1.0)
+   - Roughness Threshold (default: 0.5)
+
+6. Create Material Instance
+7. Add to Post Process Volume
+*/

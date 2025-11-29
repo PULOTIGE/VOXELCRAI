@@ -1,6 +1,7 @@
 use wgpu::util::DeviceExt;
 use wgpu::*;
 use winit::window::Window;
+use std::sync::Arc;
 
 pub struct Renderer {
     surface: Surface<'static>,
@@ -15,7 +16,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(window: &Window) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(window: Arc<Window>) -> Result<Self, Box<dyn std::error::Error>> {
         let size = window.inner_size();
         
         // Create instance with Vulkan backend
@@ -84,7 +85,7 @@ impl Renderer {
             layout: Some(&render_pipeline_layout),
             vertex: VertexState {
                 module: &shader,
-                entry_point: Some("vs_main"),
+                entry_point: "vs_main",
                 buffers: &[VertexBufferLayout {
                     array_stride: 24, // 3 f32 position + 3 f32 color
                     step_mode: VertexStepMode::Vertex,
@@ -104,7 +105,7 @@ impl Renderer {
             },
             fragment: Some(FragmentState {
                 module: &shader,
-                entry_point: Some("fs_main"),
+                entry_point: "fs_main",
                 targets: &[Some(ColorTargetState {
                     format: config.format,
                     blend: Some(BlendState::ALPHA_BLENDING),

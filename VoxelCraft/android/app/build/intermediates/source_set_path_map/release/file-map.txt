@@ -1,0 +1,7 @@
+com.pulotige.voxelcraft.app-pngs-0 /workspace/VoxelCraft/android/app/build/generated/res/pngs/release
+com.pulotige.voxelcraft.app-resValues-1 /workspace/VoxelCraft/android/app/build/generated/res/resValues/release
+com.pulotige.voxelcraft.app-packageReleaseResources-2 /workspace/VoxelCraft/android/app/build/intermediates/incremental/release/packageReleaseResources/merged.dir
+com.pulotige.voxelcraft.app-packageReleaseResources-3 /workspace/VoxelCraft/android/app/build/intermediates/incremental/release/packageReleaseResources/stripped.dir
+com.pulotige.voxelcraft.app-merged_res-4 /workspace/VoxelCraft/android/app/build/intermediates/merged_res/release
+com.pulotige.voxelcraft.app-main-5 /workspace/VoxelCraft/android/app/src/main/res
+com.pulotige.voxelcraft.app-release-6 /workspace/VoxelCraft/android/app/src/release/res

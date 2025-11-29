@@ -2,7 +2,11 @@
 
 pub mod archguard;
 pub mod ecs;
+#[cfg(feature = "gui")]
+pub mod editor;
 pub mod evolution;
+#[cfg(feature = "gui")]
+pub mod game;
 pub mod lighting;
 #[cfg(feature = "gui")]
 pub mod renderer;

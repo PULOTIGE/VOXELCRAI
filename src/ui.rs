@@ -3,7 +3,6 @@ use crate::evolution::EvolutionEngine;
 use crate::lighting::LightingSystem;
 use crate::voxel::VoxelWorld;
 use eframe::egui;
-use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 pub struct EngineUI {
@@ -71,7 +70,7 @@ impl eframe::App for EngineUI {
             ui.separator();
             ui.heading("ArchGuard Enterprise");
             ui.label(format!("Circuit Open: {}", 
-                self.archguard.circuit_open.load(Ordering::Acquire)));
+                self.archguard.is_circuit_open()));
             
             let empathy = pollster::block_on(self.archguard.get_empathy_ratio());
             ui.label(format!("Empathy Ratio: {:.3}", empathy));
