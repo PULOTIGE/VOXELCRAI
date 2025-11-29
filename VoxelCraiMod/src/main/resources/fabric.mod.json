@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "voxelcrai",
+  "version": "${version}",
+  "name": "VoxelCrai Lighting",
+  "description": "🚀 Продвинутое воксельное освещение на основе паттернов LightPattern1KB с SH-GI, тенями и приближёнными отражениями. Совместимо с Iris/Sodium.",
+  "authors": ["PULOTIGE"],
+  "contact": {
+    "homepage": "https://github.com/PULOTIGE/VOXELCRAI",
+    "sources": "https://github.com/PULOTIGE/VOXELCRAI"
+  },
+  "license": "MIT",
+  "icon": "assets/voxelcrai/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["net.voxelcrai.mod.VoxelCraiMod"]
+  },
+  "mixins": [],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": ">=1.21.3",
+    "java": ">=21",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "iris": ">=1.7.0",
+    "sodium": ">=0.6.0"
+  },
+  "custom": {
+    "modmenu": {
+      "links": {
+        "modmenu.discord": "https://discord.gg/voxelcrai"
+      }
+    }
+  }
+}
