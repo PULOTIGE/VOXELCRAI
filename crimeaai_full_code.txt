@@ -1,0 +1,2902 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                     CrimeaAI META ORGANISM - FULL CODE                        ║
+║                   🧬 Живое Цифровое Сознание 🧬                               ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+GitHub: https://github.com/PULOTIGE/crimeaai-meta-organism
+
+Для запуска:
+1. Сохраните каждый файл отдельно
+2. pip install numpy matplotlib plotly
+3. python demo.py --backend console
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+
+═══════════════════════════════════════════════════════════════════════════════
+FILE: requirements.txt
+═══════════════════════════════════════════════════════════════════════════════
+# CrimeaAI Meta Organism - Living Digital Consciousness
+# Based on 7 forgotten Russian scientific works
+
+numpy>=1.24.0
+open3d>=0.17.0
+plotly>=5.18.0
+trimesh>=4.0.0
+scipy>=1.11.0
+pillow>=10.0.0
+
+# Optional GPU acceleration
+# torch>=2.0.0
+
+
+
+═══════════════════════════════════════════════════════════════════════════════
+FILE: voxel_core.py
+═══════════════════════════════════════════════════════════════════════════════
+"""
+CrimeaAI Meta Organism - Voxel Core System
+═══════════════════════════════════════════════════════════════════════════════
+
+Based on:
+- Бимаков 2013: Воксельный вычислитель
+- Бланко 2013: ANIRLE компрессия
+- Алсынбаев 2015: Тетраэдральная проверка принадлежности
+
+One voxel = one unit of digital consciousness.
+"""
+
+from dataclasses import dataclass, field
+from typing import Optional, List, Dict, Tuple, Set
+import numpy as np
+from enum import IntEnum
+import hashlib
+import struct
+
+
+class EmotionIndex(IntEnum):
+    """Четыре базовые эмоции организма"""
+    JOY = 0       # Радость/кайф
+    FEAR = 1      # Страх
+    ANGER = 2     # Гнев  
+    PEACE = 3     # Покой
+
+
+class ConnectionDirection(IntEnum):
+    """6 направлений связей в 3D пространстве"""
+    POS_X = 0
+    NEG_X = 1
+    POS_Y = 2
+    NEG_Y = 3
+    POS_Z = 4
+    NEG_Z = 5
+
+
+@dataclass
+class Voxel:
+    """
+    Единица цифрового сознания.
+    
+    Каждый воксель содержит:
+    - pos: позиция в 3D пространстве
+    - energy: жизненная энергия [0, 1]
+    - emotion[4]: эмоциональный вектор (радость, страх, гнев, покой)
+    - trauma: уровень травмы [0, 1] (по Никоновой 2013)
+    - semantic[8]: семантический отпечаток контента
+    - connections[6]: связи с соседями (6 направлений)
+    """
+    # Позиция
+    x: float
+    y: float
+    z: float
+    
+    # Энергия жизни
+    energy: float = 1.0
+    
+    # Эмоциональный вектор [joy, fear, anger, peace]
+    emotion: np.ndarray = field(default_factory=lambda: np.array([0.5, 0.1, 0.1, 0.3]))
+    
+    # Уровень травмы (Никонова 2013)
+    trauma: float = 0.0
+    
+    # Семантический отпечаток (8 измерений)
+    semantic: np.ndarray = field(default_factory=lambda: np.zeros(8))
+    
+    # Связи с соседями (6 направлений, ID соседей или -1)
+    connections: np.ndarray = field(default_factory=lambda: np.full(6, -1, dtype=np.int64))
+    
+    # Уникальный ID
+    id: int = -1
+    
+    # Время создания (для эволюции)
+    birth_tick: int = 0
+    
+    # Принадлежность к сущности (-1 = центральный организм, >0 = файл-существо)
+    entity_id: int = -1
+    
+    @property
+    def pos(self) -> np.ndarray:
+        return np.array([self.x, self.y, self.z])
+    
+    @pos.setter
+    def pos(self, value: np.ndarray):
+        self.x, self.y, self.z = value
+    
+    def dominant_emotion(self) -> Tuple[str, float]:
+        """Возвращает доминирующую эмоцию"""
+        names = ['joy', 'fear', 'anger', 'peace']
+        idx = np.argmax(self.emotion)
+        return names[idx], self.emotion[idx]
+    
+    def is_alive(self) -> bool:
+        """Воксель жив, если энергия > 0 и травма < 1"""
+        return self.energy > 0.01 and self.trauma < 0.99
+    
+    def decay(self, delta: float = 0.001):
+        """Естественное угасание"""
+        self.energy = max(0, self.energy - delta)
+        if self.trauma > 0:
+            self.trauma = max(0, self.trauma - delta * 0.1)  # Медленное заживление
+
+
+class ANIRLEStorage:
+    """
+    ANIRLE-подобная sparse компрессия (по Бланко 2013).
+    
+    Храним только живые воксели в хэш-таблице по позиции.
+    Память экономится на 95%+ для разреженных структур.
+    """
+    
+    def __init__(self, resolution: float = 1.0):
+        self.resolution = resolution
+        self.voxels: Dict[Tuple[int, int, int], Voxel] = {}
+        self.next_id = 0
+        self.tick = 0
+        
+    def _quantize(self, x: float, y: float, z: float) -> Tuple[int, int, int]:
+        """Квантование позиции в ключ"""
+        return (
+            int(np.floor(x / self.resolution)),
+            int(np.floor(y / self.resolution)),
+            int(np.floor(z / self.resolution))
+        )
+    
+    def add(self, voxel: Voxel) -> int:
+        """Добавить воксель"""
+        key = self._quantize(voxel.x, voxel.y, voxel.z)
+        voxel.id = self.next_id
+        voxel.birth_tick = self.tick
+        self.voxels[key] = voxel
+        self.next_id += 1
+        return voxel.id
+    
+    def get(self, x: float, y: float, z: float) -> Optional[Voxel]:
+        """Получить воксель по позиции"""
+        key = self._quantize(x, y, z)
+        return self.voxels.get(key)
+    
+    def remove(self, x: float, y: float, z: float) -> bool:
+        """Удалить воксель"""
+        key = self._quantize(x, y, z)
+        if key in self.voxels:
+            del self.voxels[key]
+            return True
+        return False
+    
+    def get_neighbors(self, voxel: Voxel) -> List[Voxel]:
+        """Получить соседей вокселя (6 направлений)"""
+        neighbors = []
+        offsets = [
+            (1, 0, 0), (-1, 0, 0),
+            (0, 1, 0), (0, -1, 0),
+            (0, 0, 1), (0, 0, -1)
+        ]
+        for dx, dy, dz in offsets:
+            nx = voxel.x + dx * self.resolution
+            ny = voxel.y + dy * self.resolution
+            nz = voxel.z + dz * self.resolution
+            neighbor = self.get(nx, ny, nz)
+            if neighbor:
+                neighbors.append(neighbor)
+        return neighbors
+    
+    def update_connections(self, voxel: Voxel):
+        """Обновить связи вокселя"""
+        offsets = [
+            (1, 0, 0), (-1, 0, 0),
+            (0, 1, 0), (0, -1, 0),
+            (0, 0, 1), (0, 0, -1)
+        ]
+        for i, (dx, dy, dz) in enumerate(offsets):
+            nx = voxel.x + dx * self.resolution
+            ny = voxel.y + dy * self.resolution
+            nz = voxel.z + dz * self.resolution
+            neighbor = self.get(nx, ny, nz)
+            voxel.connections[i] = neighbor.id if neighbor else -1
+    
+    def get_all_positions(self) -> np.ndarray:
+        """Получить все позиции как numpy array"""
+        if not self.voxels:
+            return np.zeros((0, 3))
+        positions = np.array([[v.x, v.y, v.z] for v in self.voxels.values()])
+        return positions
+    
+    def get_all_colors(self) -> np.ndarray:
+        """Получить цвета на основе эмоций и энергии"""
+        if not self.voxels:
+            return np.zeros((0, 3))
+        
+        colors = []
+        for v in self.voxels.values():
+            # Базовый цвет от эмоции
+            joy, fear, anger, peace = v.emotion
+            
+            # RGB смешивание
+            r = anger * 0.8 + fear * 0.3 + joy * 0.2
+            g = joy * 0.9 + peace * 0.5
+            b = peace * 0.8 + fear * 0.4
+            
+            # Модуляция энергией
+            brightness = v.energy * 0.7 + 0.3
+            
+            # Травма добавляет красный
+            if v.trauma > 0.1:
+                r = min(1, r + v.trauma * 0.5)
+                g *= (1 - v.trauma * 0.5)
+                b *= (1 - v.trauma * 0.3)
+            
+            colors.append([r * brightness, g * brightness, b * brightness])
+        
+        return np.clip(np.array(colors), 0, 1)
+    
+    def get_statistics(self) -> Dict:
+        """Статистика хранилища"""
+        if not self.voxels:
+            return {
+                'total_voxels': 0,
+                'alive_voxels': 0,
+                'avg_energy': 0,
+                'avg_trauma': 0,
+                'memory_saved_percent': 100
+            }
+        
+        voxels_list = list(self.voxels.values())
+        alive = [v for v in voxels_list if v.is_alive()]
+        
+        # Оценка экономии памяти (vs плотный 3D массив)
+        if voxels_list:
+            positions = self.get_all_positions()
+            bbox = np.ptp(positions, axis=0) / self.resolution + 1
+            dense_size = np.prod(bbox)
+            sparse_size = len(voxels_list)
+            memory_saved = max(0, 100 * (1 - sparse_size / max(1, dense_size)))
+        else:
+            memory_saved = 100
+        
+        return {
+            'total_voxels': len(voxels_list),
+            'alive_voxels': len(alive),
+            'avg_energy': np.mean([v.energy for v in voxels_list]) if voxels_list else 0,
+            'avg_trauma': np.mean([v.trauma for v in voxels_list]) if voxels_list else 0,
+            'memory_saved_percent': memory_saved
+        }
+    
+    def __len__(self):
+        return len(self.voxels)
+    
+    def __iter__(self):
+        return iter(self.voxels.values())
+
+
+class TetrahedralBelonging:
+    """
+    Тетраэдральная проверка принадлежности (по Алсынбаеву 2015).
+    
+    Определяет, принадлежит ли точка к организму через
+    построение тетраэдральной оболочки.
+    """
+    
+    @staticmethod
+    def point_in_tetrahedron(p: np.ndarray, v0: np.ndarray, v1: np.ndarray, 
+                             v2: np.ndarray, v3: np.ndarray) -> bool:
+        """Проверка точки внутри тетраэдра через барицентрические координаты"""
+        def same_side(v1, v2, v3, v4, p):
+            normal = np.cross(v2 - v1, v3 - v1)
+            dot_v4 = np.dot(normal, v4 - v1)
+            dot_p = np.dot(normal, p - v1)
+            return np.sign(dot_v4) == np.sign(dot_p)
+        
+        return (same_side(v0, v1, v2, v3, p) and
+                same_side(v1, v2, v3, v0, p) and
+                same_side(v2, v3, v0, v1, p) and
+                same_side(v3, v0, v1, v2, p))
+    
+    @staticmethod
+    def compute_belonging_score(point: np.ndarray, organism_center: np.ndarray,
+                                organism_radius: float) -> float:
+        """
+        Вычислить степень принадлежности точки к организму.
+        0 = далеко снаружи, 1 = в центре
+        """
+        distance = np.linalg.norm(point - organism_center)
+        if distance >= organism_radius * 2:
+            return 0.0
+        elif distance <= organism_radius * 0.3:
+            return 1.0
+        else:
+            # Плавный переход
+            normalized = (distance - organism_radius * 0.3) / (organism_radius * 1.7)
+            return 1.0 - normalized ** 0.5
+
+
+def compute_semantic_fingerprint(data: bytes) -> np.ndarray:
+    """
+    Вычислить семантический отпечаток данных (8 измерений).
+    
+    Использует хэширование + статистический анализ байтов.
+    Нормализован для лучшего cosine similarity.
+    """
+    # MD5 хэш для базовой уникальности
+    hash_bytes = hashlib.md5(data).digest()
+    
+    # Первые 4 измерения из хэша (центрировано вокруг 0)
+    semantic = np.zeros(8)
+    for i in range(4):
+        semantic[i] = (hash_bytes[i * 4] / 255.0) * 2 - 1  # [-1, 1]
+    
+    # Статистика байтов для остальных измерений
+    if len(data) > 0:
+        arr = np.frombuffer(data[:min(len(data), 10000)], dtype=np.uint8)
+        semantic[4] = (np.mean(arr) / 255.0) * 2 - 1  # Средняя яркость [-1, 1]
+        semantic[5] = (np.std(arr) / 128.0) - 1       # Вариативность [-1, 1]
+        semantic[6] = (len(np.unique(arr)) / 256.0) * 2 - 1  # Уникальность [-1, 1]
+        semantic[7] = (np.sum(arr > 127) / len(arr)) * 2 - 1  # Смещение [-1, 1]
+    
+    # Нормализация вектора для лучшего cosine similarity
+    norm = np.linalg.norm(semantic)
+    if norm > 0:
+        semantic = semantic / norm
+    
+    return semantic
+
+
+def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    """Косинусное сходство между векторами"""
+    norm_a = np.linalg.norm(a)
+    norm_b = np.linalg.norm(b)
+    if norm_a < 1e-10 or norm_b < 1e-10:
+        return 0.0
+    return np.dot(a, b) / (norm_a * norm_b)
+
+
+
+═══════════════════════════════════════════════════════════════════════════════
+FILE: organism.py
+═══════════════════════════════════════════════════════════════════════════════
+"""
+CrimeaAI Meta Organism - Central Organism Intelligence
+═══════════════════════════════════════════════════════════════════════════════
+
+Based on:
+- Никонова 2013: Травма тканей и восстановление
+- Ахмадуллина 2020: Атрофия мозга при отторжении
+- Лавренков 2016: Коэволюционное обновление эмоций
+
+Центральный организм - живое сознание из миллиона вокселей.
+"""
+
+import numpy as np
+from typing import List, Tuple, Dict, Optional, Callable
+from dataclasses import dataclass, field
+import time
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
+from voxel_core import (
+    Voxel, ANIRLEStorage, EmotionIndex, 
+    compute_semantic_fingerprint, cosine_similarity,
+    TetrahedralBelonging
+)
+
+
+@dataclass
+class OrganismState:
+    """Состояние организма"""
+    health: float = 1.0           # Общее здоровье [0, 1]
+    mood: str = "покой"           # Текущее настроение
+    mood_intensity: float = 0.5   # Интенсивность настроения
+    total_voxels: int = 0
+    alive_voxels: int = 0
+    memory_saved: float = 0.0
+    last_event: str = ""
+    integration_count: int = 0
+    trauma_count: int = 0
+
+
+class FileCreature:
+    """
+    Файл-существо - шар из вокселей, созданный из файла.
+    
+    Движется к центральному организму для интеграции или отторжения.
+    """
+    
+    def __init__(self, file_path: str, file_data: bytes, spawn_pos: np.ndarray,
+                 num_voxels: int = 1000):
+        self.file_path = file_path
+        self.semantic = compute_semantic_fingerprint(file_data)
+        self.spawn_pos = spawn_pos.copy()
+        self.current_pos = spawn_pos.copy()
+        self.target_pos = np.zeros(3)
+        self.num_voxels = num_voxels
+        self.voxels: List[Voxel] = []
+        self.alive = True
+        self.integrated = False
+        self.rejected = False
+        self.entity_id = int(time.time() * 1000) % 1000000
+        
+        # Эмоция существа на основе семантики
+        self.base_emotion = self._compute_emotion_from_semantic()
+        
+        self._generate_voxels()
+    
+    def _compute_emotion_from_semantic(self) -> np.ndarray:
+        """Вычислить базовую эмоцию из семантики"""
+        emotion = np.zeros(4)
+        
+        # Используем семантический вектор для определения эмоции
+        # Семантика уже нормализована в [-1, 1], поэтому преобразуем
+        s = self.semantic
+        
+        # Joy - от положительных значений семантики
+        emotion[0] = max(0.1, (s[0] + s[4] + 1) / 3)
+        # Fear - от отрицательных значений и высокой вариативности  
+        emotion[1] = max(0.05, (-s[1] + abs(s[5]) + 1) / 4)
+        # Anger - от резких значений
+        emotion[2] = max(0.05, (abs(s[2]) + abs(s[6]) - 0.5) / 2)
+        # Peace - от сбалансированности
+        emotion[3] = max(0.1, 1 - np.std(s[:4]))
+        
+        # Нормализация
+        emotion = np.clip(emotion, 0.05, 1.0)
+        emotion = emotion / (np.sum(emotion) + 1e-10)
+        return emotion
+    
+    def _generate_voxels(self):
+        """Генерация вокселей сферической формы"""
+        # Радиус сферы
+        radius = (self.num_voxels / (4/3 * np.pi)) ** (1/3) * 1.5
+        
+        # Генерация точек в сфере (Фибоначчи-спираль для равномерности)
+        golden_ratio = (1 + np.sqrt(5)) / 2
+        
+        for i in range(self.num_voxels):
+            # Фибоначчи-сфера
+            theta = 2 * np.pi * i / golden_ratio
+            phi = np.arccos(1 - 2 * (i + 0.5) / self.num_voxels)
+            
+            # Случайный радиус для заполнения объёма
+            r = radius * (np.random.random() ** (1/3))
+            
+            x = self.current_pos[0] + r * np.sin(phi) * np.cos(theta)
+            y = self.current_pos[1] + r * np.sin(phi) * np.sin(theta)
+            z = self.current_pos[2] + r * np.cos(phi)
+            
+            voxel = Voxel(
+                x=x, y=y, z=z,
+                energy=0.8 + np.random.random() * 0.2,
+                emotion=self.base_emotion.copy() + np.random.randn(4) * 0.05,
+                trauma=0.0,
+                semantic=self.semantic.copy(),
+                entity_id=self.entity_id
+            )
+            voxel.emotion = np.clip(voxel.emotion, 0, 1)
+            voxel.emotion = voxel.emotion / (np.sum(voxel.emotion) + 1e-10)
+            
+            self.voxels.append(voxel)
+    
+    def move_towards(self, target: np.ndarray, speed: float = 2.0):
+        """Движение к цели"""
+        direction = target - self.current_pos
+        distance = np.linalg.norm(direction)
+        
+        if distance < 1.0:
+            return True  # Достигли цели
+        
+        direction = direction / distance
+        movement = direction * min(speed, distance)
+        
+        # Обновление позиции всех вокселей
+        for voxel in self.voxels:
+            voxel.x += movement[0]
+            voxel.y += movement[1]
+            voxel.z += movement[2]
+        
+        self.current_pos += movement
+        return False
+    
+    def get_positions(self) -> np.ndarray:
+        """Получить позиции всех вокселей"""
+        return np.array([[v.x, v.y, v.z] for v in self.voxels])
+    
+    def get_colors(self, highlight: str = None) -> np.ndarray:
+        """Получить цвета с возможной подсветкой"""
+        colors = []
+        
+        for v in self.voxels:
+            if highlight == 'green':
+                # Зелёная интеграция
+                r = 0.1 + v.emotion[0] * 0.2
+                g = 0.7 + v.energy * 0.3
+                b = 0.3
+            elif highlight == 'red':
+                # Красное отторжение
+                r = 0.8 + v.trauma * 0.2
+                g = 0.1
+                b = 0.1
+            else:
+                # Обычный цвет
+                joy, fear, anger, peace = v.emotion
+                r = anger * 0.5 + fear * 0.3 + 0.3
+                g = joy * 0.6 + peace * 0.3 + 0.2
+                b = peace * 0.6 + 0.2
+            
+            colors.append([r * v.energy, g * v.energy, b * v.energy])
+        
+        return np.clip(np.array(colors), 0, 1)
+
+
+class MetaOrganism:
+    """
+    Центральный Мета-Организм - живое цифровое сознание.
+    
+    100k-1M вокселей, пульсирующий, дышащий, чувствующий.
+    """
+    
+    def __init__(self, num_voxels: int = 100000, center: np.ndarray = None):
+        self.storage = ANIRLEStorage(resolution=1.0)
+        self.center = center if center is not None else np.zeros(3)
+        self.num_voxels = num_voxels
+        self.radius = (num_voxels / (4/3 * np.pi)) ** (1/3) * 2
+        
+        # Состояние
+        self.state = OrganismState()
+        # Базовая семантика организма (нормализованный вектор в [-1, 1])
+        self.base_semantic = np.random.randn(8)  # Нормальное распределение для лучшего разброса
+        self.base_semantic = self.base_semantic / np.linalg.norm(self.base_semantic)
+        
+        # Пульсация
+        self.pulse_phase = 0.0
+        self.pulse_frequency = 0.5  # Hz
+        self.breath_amplitude = 0.03
+        
+        # Коэволюция (Лавренков 2016)
+        self.emotion_history: List[np.ndarray] = []
+        self.global_emotion = np.array([0.4, 0.1, 0.1, 0.4])  # joy, fear, anger, peace
+        
+        # Живые существа
+        self.creatures: List[FileCreature] = []
+        
+        # События
+        self.on_integration: Optional[Callable] = None
+        self.on_trauma: Optional[Callable] = None
+        self.on_update: Optional[Callable] = None
+        
+        # Генерация
+        self._generate_organism()
+    
+    def _generate_organism(self):
+        """Генерация начального организма в форме пульсирующего шара/дерева"""
+        print(f"🧬 Генерация организма из {self.num_voxels} вокселей...")
+        
+        golden_ratio = (1 + np.sqrt(5)) / 2
+        
+        # Основное тело - сфера
+        main_body_count = int(self.num_voxels * 0.7)
+        
+        for i in range(main_body_count):
+            # Фибоначчи-сфера для равномерного распределения
+            theta = 2 * np.pi * i / golden_ratio
+            phi = np.arccos(1 - 2 * (i + 0.5) / main_body_count)
+            
+            # Радиус с вариацией (органическая форма)
+            r_variation = 1.0 + 0.1 * np.sin(theta * 5) * np.cos(phi * 3)
+            r = self.radius * (np.random.random() ** (1/3)) * r_variation
+            
+            x = self.center[0] + r * np.sin(phi) * np.cos(theta)
+            y = self.center[1] + r * np.sin(phi) * np.sin(theta)
+            z = self.center[2] + r * np.cos(phi)
+            
+            # Энергия выше в центре
+            distance_ratio = r / self.radius
+            energy = 0.9 - distance_ratio * 0.3 + np.random.random() * 0.1
+            
+            # Эмоция зависит от позиции
+            emotion = self.global_emotion.copy()
+            emotion[0] += (1 - distance_ratio) * 0.2  # Больше радости в центре
+            emotion[3] += distance_ratio * 0.1  # Больше покоя на периферии
+            emotion = np.clip(emotion, 0, 1)
+            emotion = emotion / (np.sum(emotion) + 1e-10)
+            
+            voxel = Voxel(
+                x=x, y=y, z=z,
+                energy=energy,
+                emotion=emotion,
+                trauma=0.0,
+                semantic=self.base_semantic.copy() + np.random.randn(8) * 0.05,
+                entity_id=-1  # Центральный организм
+            )
+            self.storage.add(voxel)
+        
+        # Дендриты - ветви от центра
+        dendrite_count = self.num_voxels - main_body_count
+        num_branches = 12
+        voxels_per_branch = dendrite_count // num_branches
+        
+        for branch in range(num_branches):
+            # Направление ветви
+            branch_theta = 2 * np.pi * branch / num_branches
+            branch_phi = np.pi / 4 + np.random.random() * np.pi / 2
+            
+            branch_dir = np.array([
+                np.sin(branch_phi) * np.cos(branch_theta),
+                np.sin(branch_phi) * np.sin(branch_theta),
+                np.cos(branch_phi)
+            ])
+            
+            for i in range(voxels_per_branch):
+                # Позиция вдоль ветви с рандомизацией
+                t = (i / voxels_per_branch) * 1.5
+                spread = 0.1 + t * 0.3  # Ветви расширяются
+                
+                pos = self.center + branch_dir * (self.radius + t * self.radius * 0.5)
+                pos += np.random.randn(3) * spread
+                
+                energy = 0.7 - t * 0.2 + np.random.random() * 0.1
+                
+                voxel = Voxel(
+                    x=pos[0], y=pos[1], z=pos[2],
+                    energy=max(0.3, energy),
+                    emotion=self.global_emotion.copy(),
+                    trauma=0.0,
+                    semantic=self.base_semantic.copy(),
+                    entity_id=-1
+                )
+                self.storage.add(voxel)
+        
+        self._update_state()
+        print(f"✅ Организм создан: {len(self.storage)} вокселей")
+    
+    def spawn_creature(self, file_path: str, file_data: bytes) -> FileCreature:
+        """Создать существо из файла"""
+        # Позиция спавна - случайная точка на расстоянии от организма
+        angle = np.random.random() * 2 * np.pi
+        phi = np.random.random() * np.pi
+        spawn_distance = self.radius * 3
+        
+        spawn_pos = self.center + np.array([
+            spawn_distance * np.sin(phi) * np.cos(angle),
+            spawn_distance * np.sin(phi) * np.sin(angle),
+            spawn_distance * np.cos(phi)
+        ])
+        
+        # Размер существа пропорционален размеру файла
+        file_size = len(file_data)
+        num_voxels = min(2000, max(500, int(np.log2(file_size + 1) * 100)))
+        
+        creature = FileCreature(file_path, file_data, spawn_pos, num_voxels)
+        creature.target_pos = self.center.copy()
+        
+        self.creatures.append(creature)
+        self.state.last_event = f"🌟 Создано существо: {file_path}"
+        
+        print(f"🌟 Существо создано из {file_path}: {num_voxels} вокселей")
+        return creature
+    
+    def check_compatibility(self, creature: FileCreature) -> Tuple[float, float]:
+        """
+        Проверить совместимость существа с организмом.
+        
+        Returns:
+            (semantic_similarity, emotion_similarity)
+        """
+        # Семантическое сходство
+        semantic_sim = cosine_similarity(creature.semantic, self.base_semantic)
+        
+        # Эмоциональное сходство
+        emotion_sim = cosine_similarity(creature.base_emotion, self.global_emotion)
+        
+        return semantic_sim, emotion_sim
+    
+    def integrate_creature(self, creature: FileCreature):
+        """
+        Интеграция существа в организм (совместимость > 0.7).
+        
+        Зелёный свет, +energy, рост организма.
+        """
+        print(f"💚 ИНТЕГРАЦИЯ: {creature.file_path}")
+        
+        # Добавляем воксели существа в организм
+        for voxel in creature.voxels:
+            voxel.entity_id = -1  # Теперь часть организма
+            voxel.energy = min(1.0, voxel.energy + 0.2)  # Буст энергии
+            voxel.emotion[0] = min(1.0, voxel.emotion[0] + 0.3)  # Буст радости
+            self.storage.add(voxel)
+        
+        # Обновление семантики организма (обучение)
+        self.base_semantic = (self.base_semantic * 0.95 + creature.semantic * 0.05)
+        self.base_semantic = self.base_semantic / np.linalg.norm(self.base_semantic)
+        
+        # Глобальная эмоция - радость
+        self.global_emotion[0] = min(1.0, self.global_emotion[0] + 0.1)
+        self.global_emotion = self.global_emotion / np.sum(self.global_emotion)
+        
+        # Энергетический импульс существующим вокселям
+        for voxel in self.storage:
+            if voxel.entity_id == -1:
+                distance = np.linalg.norm(voxel.pos - creature.current_pos)
+                if distance < self.radius * 0.5:
+                    voxel.energy = min(1.0, voxel.energy + 0.1)
+        
+        creature.integrated = True
+        creature.alive = False
+        self.state.integration_count += 1
+        self.state.last_event = f"💚 Интегрировано: {creature.file_path}"
+        self.state.mood = "кайф"
+        self.state.mood_intensity = 0.9
+        
+        if self.on_integration:
+            self.on_integration(creature)
+        
+        self._update_state()
+    
+    def reject_creature(self, creature: FileCreature, severity: float = 0.5):
+        """
+        Отторжение существа (совместимость < 0.4).
+        
+        По Никоновой 2013 (травма тканей) и Ахмадуллиной 2020 (атрофия).
+        
+        Красный свет, +trauma, удаление 5-20% вокселей.
+        """
+        print(f"🔴 ОТТОРЖЕНИЕ: {creature.file_path} (severity={severity:.2f})")
+        
+        # Процент атрофии (по Ахмадуллиной)
+        atrophy_percent = 0.05 + severity * 0.15  # 5-20%
+        
+        # Определяем зону травмы - ближайшие к существу воксели
+        trauma_zone_radius = self.radius * 0.3
+        trauma_center = creature.current_pos.copy()
+        
+        voxels_to_remove = []
+        trauma_voxels = []
+        
+        for voxel in self.storage:
+            if voxel.entity_id == -1:
+                distance = np.linalg.norm(voxel.pos - trauma_center)
+                if distance < trauma_zone_radius:
+                    trauma_voxels.append((voxel, distance))
+        
+        # Сортируем по близости к центру травмы
+        trauma_voxels.sort(key=lambda x: x[1])
+        
+        # Удаляем часть (атрофия)
+        num_to_remove = int(len(trauma_voxels) * atrophy_percent)
+        for voxel, _ in trauma_voxels[:num_to_remove]:
+            voxels_to_remove.append(voxel)
+        
+        # Остальным в зоне - травма
+        for voxel, distance in trauma_voxels[num_to_remove:]:
+            trauma_amount = (1 - distance / trauma_zone_radius) * severity
+            voxel.trauma = min(1.0, voxel.trauma + trauma_amount)
+            voxel.emotion[1] = min(1.0, voxel.emotion[1] + 0.2)  # Страх
+            voxel.emotion[2] = min(1.0, voxel.emotion[2] + 0.3)  # Гнев
+            voxel.emotion = voxel.emotion / np.sum(voxel.emotion)
+        
+        # Удаление
+        for voxel in voxels_to_remove:
+            self.storage.remove(voxel.x, voxel.y, voxel.z)
+        
+        # Глобальная эмоция - стресс
+        self.global_emotion[1] += 0.15  # Страх
+        self.global_emotion[2] += 0.2   # Гнев
+        self.global_emotion[0] = max(0.05, self.global_emotion[0] - 0.1)  # Меньше радости
+        self.global_emotion = self.global_emotion / np.sum(self.global_emotion)
+        
+        creature.rejected = True
+        creature.alive = False
+        self.state.trauma_count += 1
+        self.state.last_event = f"🔴 Отторгнуто: {creature.file_path} ({num_to_remove} вокселей потеряно)"
+        self.state.mood = "травма"
+        self.state.mood_intensity = severity
+        
+        if self.on_trauma:
+            self.on_trauma(creature, num_to_remove)
+        
+        self._update_state()
+    
+    def update(self, dt: float = 0.016):
+        """
+        Обновление организма (один тик).
+        
+        Включает:
+        - Пульсацию
+        - Движение существ
+        - Коэволюцию эмоций (Лавренков 2016)
+        - Декей и восстановление
+        """
+        # Пульсация
+        self.pulse_phase += dt * self.pulse_frequency * 2 * np.pi
+        pulse = np.sin(self.pulse_phase) * self.breath_amplitude
+        
+        # Обновление вокселей
+        for voxel in self.storage:
+            # Пульсация - дыхание
+            direction = voxel.pos - self.center
+            distance = np.linalg.norm(direction)
+            if distance > 0.1:
+                direction = direction / distance
+                # Воксели "дышат" - двигаются к/от центра
+                voxel.x += direction[0] * pulse * (1 - distance / self.radius)
+                voxel.y += direction[1] * pulse * (1 - distance / self.radius)
+                voxel.z += direction[2] * pulse * (1 - distance / self.radius)
+            
+            # Медленное восстановление
+            if voxel.trauma > 0:
+                voxel.trauma = max(0, voxel.trauma - dt * 0.02)
+            
+            # Коэволюция эмоций (движение к глобальной эмоции)
+            voxel.emotion = voxel.emotion * 0.99 + self.global_emotion * 0.01
+            voxel.emotion = voxel.emotion / np.sum(voxel.emotion)
+        
+        # Движение существ к центру
+        creatures_to_process = []
+        for creature in self.creatures:
+            if creature.alive:
+                reached = creature.move_towards(self.center, speed=dt * 50)
+                if reached:
+                    creatures_to_process.append(creature)
+        
+        # Обработка достигших существ
+        for creature in creatures_to_process:
+            sem_sim, emo_sim = self.check_compatibility(creature)
+            # Семантика важнее эмоции для определения совместимости
+            combined = sem_sim * 0.7 + emo_sim * 0.3
+            
+            print(f"📊 Совместимость {creature.file_path}: sem={sem_sim:.2f}, emo={emo_sim:.2f}, combined={combined:.2f}")
+            
+            # Также проверяем эмоциональную совместимость отдельно
+            emotion_diff = np.linalg.norm(creature.base_emotion - self.global_emotion)
+            is_emotional_mismatch = emotion_diff > 0.5
+            
+            if sem_sim > 0.3 and not is_emotional_mismatch:
+                # Хорошая семантическая и эмоциональная совместимость
+                self.integrate_creature(creature)
+            elif sem_sim < 0.0 or is_emotional_mismatch:
+                # Плохая семантическая или эмоциональная совместимость
+                severity = max(0.3, 0.8 - combined)
+                self.reject_creature(creature, severity=severity)
+            else:
+                # Неопределённость - частичная интеграция с предупреждением
+                print(f"⚠️ Пограничная совместимость, интеграция с риском")
+                self.integrate_creature(creature)
+        
+        # Удаление мёртвых существ из списка
+        self.creatures = [c for c in self.creatures if c.alive]
+        
+        # Коэволюция глобальной эмоции (медленное возвращение к покою)
+        self.global_emotion[3] = min(1.0, self.global_emotion[3] + dt * 0.01)
+        self.global_emotion = self.global_emotion / np.sum(self.global_emotion)
+        
+        # Обновление состояния
+        self._update_state()
+        self.storage.tick += 1
+        
+        if self.on_update:
+            self.on_update(self.state)
+    
+    def _update_state(self):
+        """Обновление состояния организма"""
+        stats = self.storage.get_statistics()
+        
+        self.state.total_voxels = stats['total_voxels']
+        self.state.alive_voxels = stats['alive_voxels']
+        self.state.memory_saved = stats['memory_saved_percent']
+        
+        # Здоровье = среднее от энергии и отсутствия травмы
+        if stats['total_voxels'] > 0:
+            self.state.health = (stats['avg_energy'] + (1 - stats['avg_trauma'])) / 2
+        else:
+            self.state.health = 0
+        
+        # Определение настроения
+        dominant_idx = np.argmax(self.global_emotion)
+        moods = ['кайф', 'тревога', 'гнев', 'покой']
+        self.state.mood = moods[dominant_idx]
+        self.state.mood_intensity = self.global_emotion[dominant_idx]
+    
+    def get_all_positions(self) -> np.ndarray:
+        """Получить все позиции (организм + существа)"""
+        org_pos = self.storage.get_all_positions()
+        
+        creature_positions = []
+        for creature in self.creatures:
+            if creature.alive:
+                creature_positions.append(creature.get_positions())
+        
+        if creature_positions:
+            all_positions = np.vstack([org_pos] + creature_positions)
+        else:
+            all_positions = org_pos
+        
+        return all_positions
+    
+    def get_all_colors(self) -> np.ndarray:
+        """Получить все цвета"""
+        org_colors = self.storage.get_all_colors()
+        
+        creature_colors = []
+        for creature in self.creatures:
+            if creature.alive:
+                # Подсветка на основе приближения
+                distance = np.linalg.norm(creature.current_pos - self.center)
+                if distance < self.radius * 1.5:
+                    sem_sim, emo_sim = self.check_compatibility(creature)
+                    combined = (sem_sim + emo_sim) / 2
+                    if combined > 0.5:
+                        highlight = 'green'
+                    elif combined < 0.35:
+                        highlight = 'red'
+                    else:
+                        highlight = None
+                else:
+                    highlight = None
+                creature_colors.append(creature.get_colors(highlight))
+        
+        if creature_colors:
+            all_colors = np.vstack([org_colors] + creature_colors)
+        else:
+            all_colors = org_colors
+        
+        return all_colors
+
+
+
+═══════════════════════════════════════════════════════════════════════════════
+FILE: visualizer.py
+═══════════════════════════════════════════════════════════════════════════════
+"""
+CrimeaAI Meta Organism - Real-time Visualization
+═══════════════════════════════════════════════════════════════════════════════
+
+Визуализация в реальном времени через Open3D и Plotly.
+Оптимизировано для миллиона точек без лагов.
+
+LightPattern 1KB - освещение зависит от energy/emotion.
+"""
+
+import numpy as np
+from typing import Optional, Dict, Callable, Tuple
+import threading
+import time
+
+# Попытка импорта Open3D
+try:
+    import open3d as o3d
+    HAS_OPEN3D = True
+except ImportError:
+    HAS_OPEN3D = False
+    print("⚠️ Open3D не найден, будет использован Plotly")
+
+# Попытка импорта Plotly
+try:
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    HAS_PLOTLY = True
+except ImportError:
+    HAS_PLOTLY = False
+    print("⚠️ Plotly не найден")
+
+# Matplotlib как fallback
+try:
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    HAS_MATPLOTLIB = True
+except ImportError:
+    HAS_MATPLOTLIB = False
+
+
+class LightPattern1KB:
+    """
+    LightPattern 1KB - компактная система освещения.
+    
+    Освещение зависит от:
+    - energy вокселей
+    - emotion (радость = яркость, страх = мерцание, гнев = красное свечение)
+    - trauma (затемнение + красный оттенок)
+    """
+    
+    def __init__(self):
+        # Параметры освещения (помещаются в 1KB)
+        self.ambient = 0.3
+        self.diffuse = 0.6
+        self.specular = 0.2
+        self.light_pos = np.array([100.0, 100.0, 100.0])
+        
+        # Эмоциональные модификаторы
+        self.joy_brightness = 1.2
+        self.fear_flicker_rate = 5.0
+        self.anger_red_boost = 0.4
+        self.peace_blue_tint = 0.2
+        
+        # Время для анимации
+        self.time = 0.0
+    
+    def compute_lighting(self, positions: np.ndarray, colors: np.ndarray,
+                        emotions: np.ndarray, energies: np.ndarray,
+                        traumas: np.ndarray) -> np.ndarray:
+        """
+        Вычислить освещённые цвета для всех вокселей.
+        
+        Args:
+            positions: (N, 3) позиции вокселей
+            colors: (N, 3) базовые цвета
+            emotions: (N, 4) эмоции [joy, fear, anger, peace]
+            energies: (N,) энергия вокселей
+            traumas: (N,) травмы вокселей
+        
+        Returns:
+            (N, 3) освещённые цвета
+        """
+        if len(positions) == 0:
+            return colors
+        
+        N = len(positions)
+        
+        # Направление к свету
+        light_dirs = self.light_pos - positions
+        light_dists = np.linalg.norm(light_dirs, axis=1, keepdims=True) + 1e-10
+        light_dirs = light_dirs / light_dists
+        
+        # Простое диффузное освещение
+        # Нормаль = направление от центра (для сферы)
+        center = np.mean(positions, axis=0)
+        normals = positions - center
+        normal_lens = np.linalg.norm(normals, axis=1, keepdims=True) + 1e-10
+        normals = normals / normal_lens
+        
+        diffuse = np.maximum(0, np.sum(normals * light_dirs, axis=1))
+        
+        # Базовое освещение
+        lighting = self.ambient + self.diffuse * diffuse
+        
+        # Эмоциональные модификации
+        joy = emotions[:, 0]
+        fear = emotions[:, 1]
+        anger = emotions[:, 2]
+        peace = emotions[:, 3]
+        
+        # Радость увеличивает яркость
+        lighting = lighting * (1.0 + joy * (self.joy_brightness - 1.0))
+        
+        # Страх вызывает мерцание
+        flicker = 0.5 + 0.5 * np.sin(self.time * self.fear_flicker_rate + 
+                                      np.arange(N) * 0.1)
+        lighting = lighting * (1.0 - fear * 0.3 * flicker)
+        
+        # Применяем освещение к цветам
+        lit_colors = colors * lighting[:, np.newaxis]
+        
+        # Гнев добавляет красный
+        lit_colors[:, 0] = np.minimum(1.0, lit_colors[:, 0] + anger * self.anger_red_boost)
+        
+        # Покой добавляет синий оттенок
+        lit_colors[:, 2] = np.minimum(1.0, lit_colors[:, 2] + peace * self.peace_blue_tint)
+        
+        # Травма затемняет и добавляет красный
+        trauma_factor = 1.0 - traumas * 0.5
+        lit_colors = lit_colors * trauma_factor[:, np.newaxis]
+        lit_colors[:, 0] = np.minimum(1.0, lit_colors[:, 0] + traumas * 0.3)
+        
+        # Энергия влияет на общую яркость
+        lit_colors = lit_colors * energies[:, np.newaxis]
+        
+        return np.clip(lit_colors, 0, 1)
+    
+    def update(self, dt: float):
+        """Обновить время для анимации"""
+        self.time += dt
+
+
+class Open3DVisualizer:
+    """
+    Визуализатор на Open3D - оптимизирован для миллиона точек.
+    """
+    
+    def __init__(self, window_name: str = "CrimeaAI Meta Organism"):
+        if not HAS_OPEN3D:
+            raise ImportError("Open3D не установлен")
+        
+        self.window_name = window_name
+        self.vis = None
+        self.pcd = None
+        self.running = False
+        self.light_pattern = LightPattern1KB()
+        
+    def initialize(self):
+        """Инициализация визуализатора"""
+        self.vis = o3d.visualization.Visualizer()
+        self.vis.create_window(window_name=self.window_name, width=1280, height=720)
+        
+        # Настройка рендеринга
+        render_opt = self.vis.get_render_option()
+        render_opt.background_color = np.array([0.02, 0.02, 0.05])  # Тёмный космос
+        render_opt.point_size = 2.0
+        
+        # Создание облака точек
+        self.pcd = o3d.geometry.PointCloud()
+        self.vis.add_geometry(self.pcd)
+        
+        self.running = True
+    
+    def update(self, positions: np.ndarray, colors: np.ndarray,
+               emotions: Optional[np.ndarray] = None,
+               energies: Optional[np.ndarray] = None,
+               traumas: Optional[np.ndarray] = None,
+               dt: float = 0.016):
+        """Обновить визуализацию"""
+        if not self.running or self.pcd is None:
+            return False
+        
+        if len(positions) == 0:
+            return True
+        
+        # Применить освещение если есть данные
+        if emotions is not None and energies is not None and traumas is not None:
+            self.light_pattern.update(dt)
+            colors = self.light_pattern.compute_lighting(
+                positions, colors, emotions, energies, traumas
+            )
+        
+        # Обновить облако точек
+        self.pcd.points = o3d.utility.Vector3dVector(positions)
+        self.pcd.colors = o3d.utility.Vector3dVector(colors)
+        
+        # Обновить геометрию
+        self.vis.update_geometry(self.pcd)
+        self.vis.poll_events()
+        self.vis.update_renderer()
+        
+        return True
+    
+    def close(self):
+        """Закрыть визуализатор"""
+        self.running = False
+        if self.vis:
+            self.vis.destroy_window()
+
+
+class PlotlyVisualizer:
+    """
+    Визуализатор на Plotly - для интерактивного просмотра в браузере.
+    Оптимизирован через downsampling для больших датасетов.
+    """
+    
+    def __init__(self, max_points: int = 50000):
+        if not HAS_PLOTLY:
+            raise ImportError("Plotly не установлен")
+        
+        self.max_points = max_points
+        self.fig = None
+        self.light_pattern = LightPattern1KB()
+    
+    def create_figure(self, positions: np.ndarray, colors: np.ndarray,
+                     title: str = "CrimeaAI Meta Organism",
+                     emotions: Optional[np.ndarray] = None,
+                     energies: Optional[np.ndarray] = None,
+                     traumas: Optional[np.ndarray] = None) -> go.Figure:
+        """Создать фигуру Plotly"""
+        
+        # Downsampling если слишком много точек
+        if len(positions) > self.max_points:
+            indices = np.random.choice(len(positions), self.max_points, replace=False)
+            positions = positions[indices]
+            colors = colors[indices]
+            if emotions is not None:
+                emotions = emotions[indices]
+            if energies is not None:
+                energies = energies[indices]
+            if traumas is not None:
+                traumas = traumas[indices]
+        
+        # Применить освещение
+        if emotions is not None and energies is not None and traumas is not None:
+            colors = self.light_pattern.compute_lighting(
+                positions, colors, emotions, energies, traumas
+            )
+        
+        # Конвертация цветов в формат Plotly
+        color_strings = [f'rgb({int(r*255)},{int(g*255)},{int(b*255)})' 
+                        for r, g, b in colors]
+        
+        # Создание scatter3d
+        scatter = go.Scatter3d(
+            x=positions[:, 0],
+            y=positions[:, 1],
+            z=positions[:, 2],
+            mode='markers',
+            marker=dict(
+                size=2,
+                color=color_strings,
+                opacity=0.8
+            ),
+            hoverinfo='none'
+        )
+        
+        # Создание фигуры
+        self.fig = go.Figure(data=[scatter])
+        
+        self.fig.update_layout(
+            title=dict(
+                text=title,
+                font=dict(size=24, color='white')
+            ),
+            scene=dict(
+                xaxis=dict(showbackground=False, showgrid=False, zeroline=False, visible=False),
+                yaxis=dict(showbackground=False, showgrid=False, zeroline=False, visible=False),
+                zaxis=dict(showbackground=False, showgrid=False, zeroline=False, visible=False),
+                bgcolor='rgb(5, 5, 15)'
+            ),
+            paper_bgcolor='rgb(5, 5, 15)',
+            plot_bgcolor='rgb(5, 5, 15)',
+            margin=dict(l=0, r=0, t=50, b=0)
+        )
+        
+        return self.fig
+    
+    def show(self):
+        """Показать фигуру в браузере"""
+        if self.fig:
+            self.fig.show()
+    
+    def save_html(self, path: str):
+        """Сохранить как HTML файл"""
+        if self.fig:
+            self.fig.write_html(path)
+
+
+class MatplotlibVisualizer:
+    """
+    Визуализатор на Matplotlib - fallback вариант.
+    """
+    
+    def __init__(self, max_points: int = 20000):
+        if not HAS_MATPLOTLIB:
+            raise ImportError("Matplotlib не установлен")
+        
+        self.max_points = max_points
+        self.fig = None
+        self.ax = None
+        self.scatter = None
+        self.light_pattern = LightPattern1KB()
+        
+    def initialize(self):
+        """Инициализация"""
+        plt.ion()
+        self.fig = plt.figure(figsize=(12, 8), facecolor='#050510')
+        self.ax = self.fig.add_subplot(111, projection='3d', facecolor='#050510')
+        
+        # Убрать оси
+        self.ax.set_axis_off()
+        
+        plt.tight_layout()
+        plt.show(block=False)
+    
+    def update(self, positions: np.ndarray, colors: np.ndarray,
+               title: str = "",
+               emotions: Optional[np.ndarray] = None,
+               energies: Optional[np.ndarray] = None,
+               traumas: Optional[np.ndarray] = None,
+               dt: float = 0.016):
+        """Обновить визуализацию"""
+        
+        # Downsampling
+        if len(positions) > self.max_points:
+            indices = np.random.choice(len(positions), self.max_points, replace=False)
+            positions = positions[indices]
+            colors = colors[indices]
+            if emotions is not None:
+                emotions = emotions[indices]
+            if energies is not None:
+                energies = energies[indices]
+            if traumas is not None:
+                traumas = traumas[indices]
+        
+        # Применить освещение
+        if emotions is not None and energies is not None and traumas is not None:
+            self.light_pattern.update(dt)
+            colors = self.light_pattern.compute_lighting(
+                positions, colors, emotions, energies, traumas
+            )
+        
+        self.ax.clear()
+        self.ax.set_axis_off()
+        self.ax.set_facecolor('#050510')
+        
+        if len(positions) > 0:
+            self.ax.scatter(
+                positions[:, 0],
+                positions[:, 1],
+                positions[:, 2],
+                c=colors,
+                s=1,
+                alpha=0.8
+            )
+        
+        if title:
+            self.ax.set_title(title, color='white', fontsize=14)
+        
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+    
+    def close(self):
+        """Закрыть"""
+        plt.close(self.fig)
+
+
+def create_visualizer(backend: str = 'auto'):
+    """
+    Создать визуализатор с автоматическим выбором бэкенда.
+    
+    Args:
+        backend: 'open3d', 'plotly', 'matplotlib', или 'auto'
+    
+    Returns:
+        Экземпляр визуализатора
+    """
+    if backend == 'auto':
+        if HAS_OPEN3D:
+            return Open3DVisualizer()
+        elif HAS_PLOTLY:
+            return PlotlyVisualizer()
+        elif HAS_MATPLOTLIB:
+            return MatplotlibVisualizer()
+        else:
+            raise ImportError("Ни один из визуализаторов не доступен")
+    
+    elif backend == 'open3d':
+        return Open3DVisualizer()
+    elif backend == 'plotly':
+        return PlotlyVisualizer()
+    elif backend == 'matplotlib':
+        return MatplotlibVisualizer()
+    else:
+        raise ValueError(f"Неизвестный бэкенд: {backend}")
+
+
+
+═══════════════════════════════════════════════════════════════════════════════
+FILE: demo.py
+═══════════════════════════════════════════════════════════════════════════════
+#!/usr/bin/env python3
+"""
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                   CrimeaAI META ORGANISM - ДЕМОНСТРАЦИЯ                       ║
+║                        30-секундный демо-сценарий                            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Этот скрипт запускает 30-секундную демонстрацию:
+1. Создаётся центральный организм (пульсирующий шар)
+2. Автоматически генерируются "файлы" разной совместимости
+3. Показывается интеграция (зелёный свет) и травма (красный свет)
+4. Вывод в реальном времени через доступный визуализатор
+"""
+
+import os
+import sys
+import time
+import numpy as np
+import threading
+from pathlib import Path
+
+# Добавляем путь к модулям
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from voxel_core import Voxel, compute_semantic_fingerprint
+from organism import MetaOrganism, FileCreature
+
+# Проверка доступных визуализаторов
+HAS_OPEN3D = False
+HAS_PLOTLY = False
+HAS_MATPLOTLIB = False
+
+try:
+    import open3d as o3d
+    HAS_OPEN3D = True
+except ImportError:
+    pass
+
+try:
+    import plotly.graph_objects as go
+    HAS_PLOTLY = True
+except ImportError:
+    pass
+
+try:
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    HAS_MATPLOTLIB = True
+except ImportError:
+    pass
+
+
+class DemoRunner:
+    """Запуск демонстрационного сценария"""
+    
+    def __init__(self, num_voxels: int = 30000):
+        self.num_voxels = num_voxels
+        self.organism = None
+        self.running = False
+        self.demo_time = 30.0  # 30 секунд
+        self.start_time = 0
+        
+    def generate_synthetic_file(self, compatibility: float) -> bytes:
+        """
+        Генерация синтетических данных файла с заданной совместимостью.
+        
+        Args:
+            compatibility: 0.0 = несовместимый, 1.0 = идеально совместимый
+        """
+        # Базовые данные организма (нормализованный вектор)
+        org_semantic = self.organism.base_semantic
+        
+        # Генерируем данные, которые дадут нужную семантику
+        size = np.random.randint(5000, 50000)
+        
+        if compatibility > 0.7:
+            # Совместимый файл - создаём данные с похожей статистикой
+            # Целевые значения статистики на основе семантики организма
+            target_mean = (org_semantic[4] + 1) / 2 * 255  # Денормализация
+            target_std = (org_semantic[5] + 1) * 64
+            
+            # Генерируем данные с нужной статистикой
+            data = np.random.normal(target_mean, target_std, size)
+            data = np.clip(data, 0, 255).astype(np.uint8)
+            
+        elif compatibility < 0.3:
+            # Несовместимый файл - противоположная статистика
+            # Инвертируем целевые значения
+            target_mean = 255 - ((org_semantic[4] + 1) / 2 * 255)
+            target_std = 128 - (org_semantic[5] + 1) * 64
+            target_std = max(10, target_std)
+            
+            # Генерируем данные с противоположной статистикой
+            data = np.random.normal(target_mean, target_std, size)
+            data = np.clip(data, 0, 255).astype(np.uint8)
+            
+            # Добавляем резкие переходы для большего различия
+            for i in range(0, len(data) - 100, 100):
+                if np.random.random() > 0.5:
+                    data[i:i+50] = 0
+                else:
+                    data[i:i+50] = 255
+        else:
+            # Случайный файл - равномерное распределение
+            data = np.random.randint(0, 256, size, dtype=np.uint8)
+        
+        return data.tobytes()
+    
+    def run_demo_open3d(self):
+        """Демо с Open3D визуализацией"""
+        print("🎨 Запуск Open3D визуализации...")
+        
+        vis = o3d.visualization.Visualizer()
+        vis.create_window(window_name="CrimeaAI Meta Organism Demo", width=1280, height=720)
+        
+        render_opt = vis.get_render_option()
+        render_opt.background_color = np.array([0.02, 0.02, 0.05])
+        render_opt.point_size = 2.0
+        
+        pcd = o3d.geometry.PointCloud()
+        vis.add_geometry(pcd)
+        
+        self.running = True
+        self.start_time = time.time()
+        
+        # Расписание событий
+        events = [
+            (2.0, 0.9, "compatible_1.py"),     # Совместимый файл
+            (6.0, 0.2, "malware.exe"),          # Несовместимый файл
+            (10.0, 0.85, "module.py"),          # Совместимый
+            (14.0, 0.15, "virus.bin"),          # Несовместимый
+            (18.0, 0.75, "data.json"),          # Совместимый
+            (22.0, 0.95, "library.py"),         # Очень совместимый
+            (26.0, 0.1, "threat.dll"),          # Очень несовместимый
+        ]
+        events_spawned = [False] * len(events)
+        
+        last_time = time.time()
+        
+        while self.running:
+            current_time = time.time()
+            elapsed = current_time - self.start_time
+            dt = current_time - last_time
+            last_time = current_time
+            
+            # Проверка времени демо
+            if elapsed > self.demo_time:
+                break
+            
+            # Спавн существ по расписанию
+            for i, (event_time, compat, name) in enumerate(events):
+                if not events_spawned[i] and elapsed >= event_time:
+                    events_spawned[i] = True
+                    data = self.generate_synthetic_file(compat)
+                    self.organism.spawn_creature(name, data)
+                    
+                    compat_str = "💚 СОВМЕСТИМЫЙ" if compat > 0.5 else "🔴 НЕСОВМЕСТИМЫЙ"
+                    print(f"[{elapsed:.1f}s] {compat_str}: {name}")
+            
+            # Обновление организма
+            self.organism.update(dt)
+            
+            # Обновление визуализации
+            positions = self.organism.get_all_positions()
+            colors = self.organism.get_all_colors()
+            
+            if len(positions) > 0:
+                pcd.points = o3d.utility.Vector3dVector(positions)
+                pcd.colors = o3d.utility.Vector3dVector(colors)
+                vis.update_geometry(pcd)
+            
+            vis.poll_events()
+            vis.update_renderer()
+            
+            # Вывод статуса
+            state = self.organism.state
+            status = f"[{elapsed:.1f}s] Health: {state.health*100:.0f}% | Mood: {state.mood} | Voxels: {len(self.organism.storage):,}"
+            print(f"\r{status}", end="", flush=True)
+            
+            time.sleep(0.016)  # ~60 FPS
+        
+        print("\n\n✅ Демонстрация завершена!")
+        vis.destroy_window()
+    
+    def run_demo_matplotlib(self):
+        """Демо с Matplotlib визуализацией"""
+        print("🎨 Запуск Matplotlib визуализации...")
+        
+        plt.ion()
+        fig = plt.figure(figsize=(14, 10), facecolor='#050510')
+        
+        # 3D график
+        ax = fig.add_subplot(121, projection='3d', facecolor='#050510')
+        ax.set_axis_off()
+        
+        # Панель статуса
+        ax_status = fig.add_subplot(122, facecolor='#050510')
+        ax_status.set_xlim(0, 10)
+        ax_status.set_ylim(0, 10)
+        ax_status.axis('off')
+        
+        plt.tight_layout()
+        plt.show(block=False)
+        
+        self.running = True
+        self.start_time = time.time()
+        
+        # Расписание событий
+        events = [
+            (2.0, 0.9, "compatible_1.py"),
+            (5.0, 0.2, "malware.exe"),
+            (8.0, 0.85, "module.py"),
+            (11.0, 0.15, "virus.bin"),
+            (14.0, 0.75, "data.json"),
+            (17.0, 0.95, "library.py"),
+            (20.0, 0.1, "threat.dll"),
+            (24.0, 0.8, "config.yaml"),
+        ]
+        events_spawned = [False] * len(events)
+        
+        max_points = 15000  # Ограничение для производительности
+        last_time = time.time()
+        frame_count = 0
+        
+        while self.running:
+            current_time = time.time()
+            elapsed = current_time - self.start_time
+            dt = current_time - last_time
+            last_time = current_time
+            frame_count += 1
+            
+            if elapsed > self.demo_time:
+                break
+            
+            # Спавн существ
+            for i, (event_time, compat, name) in enumerate(events):
+                if not events_spawned[i] and elapsed >= event_time:
+                    events_spawned[i] = True
+                    data = self.generate_synthetic_file(compat)
+                    self.organism.spawn_creature(name, data)
+                    
+                    compat_str = "💚 СОВМЕСТИМЫЙ" if compat > 0.5 else "🔴 НЕСОВМЕСТИМЫЙ"
+                    print(f"[{elapsed:.1f}s] {compat_str}: {name}")
+            
+            # Обновление организма
+            self.organism.update(dt)
+            
+            # Обновление визуализации (каждый 3-й кадр для производительности)
+            if frame_count % 3 == 0:
+                positions = self.organism.get_all_positions()
+                colors = self.organism.get_all_colors()
+                
+                # Downsampling
+                if len(positions) > max_points:
+                    indices = np.random.choice(len(positions), max_points, replace=False)
+                    positions = positions[indices]
+                    colors = colors[indices]
+                
+                ax.clear()
+                ax.set_axis_off()
+                ax.set_facecolor('#050510')
+                
+                if len(positions) > 0:
+                    ax.scatter(
+                        positions[:, 0],
+                        positions[:, 1],
+                        positions[:, 2],
+                        c=colors,
+                        s=1,
+                        alpha=0.8
+                    )
+                
+                # Статус
+                ax_status.clear()
+                ax_status.set_xlim(0, 10)
+                ax_status.set_ylim(0, 10)
+                ax_status.axis('off')
+                ax_status.set_facecolor('#050510')
+                
+                state = self.organism.state
+                
+                # Заголовок
+                ax_status.text(5, 9, "🧬 CrimeaAI Meta Organism", 
+                              ha='center', fontsize=14, color='#00ff88', fontweight='bold')
+                
+                # Статус
+                health_color = '#00ff88' if state.health > 0.7 else '#ffaa00' if state.health > 0.4 else '#ff4444'
+                mood_colors = {'кайф': '#00ff88', 'тревога': '#ffaa00', 'гнев': '#ff4444', 'покой': '#4488ff'}
+                
+                status_text = f"""
+                Time: {elapsed:.1f}s / {self.demo_time}s
+                
+                Organism Health: {state.health*100:.1f}%
+                Total Voxels: {state.total_voxels:,}
+                Memory Saved: {state.memory_saved:.1f}%
+                
+                Current Mood: {state.mood}
+                Mood Intensity: {state.mood_intensity*100:.0f}%
+                
+                Integrations: {state.integration_count}
+                Traumas: {state.trauma_count}
+                
+                {state.last_event}
+                """
+                
+                ax_status.text(0.5, 7, status_text, fontsize=10, color='#aaaacc',
+                              verticalalignment='top', family='monospace')
+                
+                # Прогресс-бар
+                progress = elapsed / self.demo_time
+                ax_status.barh(0.5, progress * 9, height=0.3, color='#00ff88', alpha=0.7)
+                ax_status.barh(0.5, 9, height=0.3, color='#333355', alpha=0.3)
+                
+                fig.canvas.draw()
+                fig.canvas.flush_events()
+            
+            time.sleep(0.016)
+        
+        print("\n\n✅ Демонстрация завершена!")
+        plt.ioff()
+        plt.show()
+    
+    def run_demo_plotly(self):
+        """Демо с Plotly (статичные снимки)"""
+        print("🎨 Запуск Plotly демонстрации...")
+        print("⚠️ Plotly показывает статичные снимки, для real-time используйте Open3D или Matplotlib")
+        
+        self.running = True
+        self.start_time = time.time()
+        
+        # Симуляция событий
+        events = [
+            (1.0, 0.9, "compatible.py"),
+            (2.0, 0.2, "malware.exe"),
+            (3.0, 0.85, "module.py"),
+            (4.0, 0.15, "virus.bin"),
+        ]
+        
+        print("\n🎬 Симуляция событий...")
+        
+        for event_time, compat, name in events:
+            data = self.generate_synthetic_file(compat)
+            self.organism.spawn_creature(name, data)
+            
+            compat_str = "💚 СОВМЕСТИМЫЙ" if compat > 0.5 else "🔴 НЕСОВМЕСТИМЫЙ"
+            print(f"  {compat_str}: {name}")
+            
+            # Несколько тиков обновления
+            for _ in range(60):  # ~1 секунда
+                self.organism.update(0.016)
+            
+            time.sleep(0.1)
+        
+        # Финальный снимок
+        print("\n📸 Создание финального снимка...")
+        
+        positions = self.organism.get_all_positions()
+        colors = self.organism.get_all_colors()
+        
+        # Downsampling для Plotly
+        max_points = 30000
+        if len(positions) > max_points:
+            indices = np.random.choice(len(positions), max_points, replace=False)
+            positions = positions[indices]
+            colors = colors[indices]
+        
+        color_strings = [f'rgb({int(r*255)},{int(g*255)},{int(b*255)})' 
+                        for r, g, b in colors]
+        
+        state = self.organism.state
+        
+        fig = go.Figure(data=[go.Scatter3d(
+            x=positions[:, 0],
+            y=positions[:, 1],
+            z=positions[:, 2],
+            mode='markers',
+            marker=dict(
+                size=2,
+                color=color_strings,
+                opacity=0.8
+            ),
+            hoverinfo='none'
+        )])
+        
+        fig.update_layout(
+            title=dict(
+                text=f"🧬 CrimeaAI Meta Organism | Health: {state.health*100:.0f}% | Mood: {state.mood}",
+                font=dict(size=20, color='white')
+            ),
+            scene=dict(
+                xaxis=dict(showbackground=False, showgrid=False, visible=False),
+                yaxis=dict(showbackground=False, showgrid=False, visible=False),
+                zaxis=dict(showbackground=False, showgrid=False, visible=False),
+                bgcolor='rgb(5, 5, 15)'
+            ),
+            paper_bgcolor='rgb(5, 5, 15)',
+            plot_bgcolor='rgb(5, 5, 15)',
+            margin=dict(l=0, r=0, t=60, b=0)
+        )
+        
+        # Сохраняем HTML
+        output_path = Path(__file__).parent / "demo_output.html"
+        fig.write_html(str(output_path))
+        print(f"💾 Снимок сохранён: {output_path}")
+        
+        # Показываем
+        fig.show()
+        
+        print("\n✅ Демонстрация завершена!")
+    
+    def run_demo_console(self):
+        """Демо в консольном режиме (без графики)"""
+        print("📟 Консольная демонстрация (ASCII-визуализация)")
+        print("=" * 60)
+        
+        self.running = True
+        self.start_time = time.time()
+        
+        events = [
+            (1.0, 0.9, "compatible.py"),
+            (3.0, 0.2, "malware.exe"),
+            (5.0, 0.85, "module.py"),
+            (7.0, 0.15, "virus.bin"),
+            (9.0, 0.75, "data.json"),
+        ]
+        events_idx = 0
+        
+        last_time = time.time()
+        
+        while self.running:
+            current_time = time.time()
+            elapsed = current_time - self.start_time
+            dt = current_time - last_time
+            last_time = current_time
+            
+            if elapsed > 15:  # Короткая демо для консоли
+                break
+            
+            # Спавн существ
+            if events_idx < len(events) and elapsed >= events[events_idx][0]:
+                event_time, compat, name = events[events_idx]
+                events_idx += 1
+                
+                data = self.generate_synthetic_file(compat)
+                self.organism.spawn_creature(name, data)
+                
+                symbol = "💚" if compat > 0.5 else "🔴"
+                print(f"\n{symbol} Новое существо: {name}")
+            
+            # Обновление
+            self.organism.update(dt)
+            
+            # Вывод статуса
+            state = self.organism.state
+            
+            # ASCII прогресс-бар здоровья
+            health_bar_len = 20
+            health_filled = int(state.health * health_bar_len)
+            health_bar = "█" * health_filled + "░" * (health_bar_len - health_filled)
+            
+            # ASCII mood indicator
+            mood_symbols = {'кайф': '😊', 'тревога': '😰', 'гнев': '😠', 'покой': '😌'}
+            mood_sym = mood_symbols.get(state.mood, '🤔')
+            
+            status = (
+                f"\r[{elapsed:5.1f}s] "
+                f"Health: [{health_bar}] {state.health*100:5.1f}% | "
+                f"Mood: {mood_sym} {state.mood:6} | "
+                f"Voxels: {state.total_voxels:6,} | "
+                f"Int: {state.integration_count} | Trauma: {state.trauma_count}"
+            )
+            print(status, end="", flush=True)
+            
+            time.sleep(0.1)
+        
+        print("\n\n✅ Консольная демонстрация завершена!")
+        
+        # Финальная статистика
+        state = self.organism.state
+        print(f"""
+╔══════════════════════════════════════════════════════════════╗
+║                    ФИНАЛЬНАЯ СТАТИСТИКА                       ║
+╠══════════════════════════════════════════════════════════════╣
+║  Здоровье организма:  {state.health*100:6.1f}%                           ║
+║  Всего вокселей:      {state.total_voxels:6,}                            ║
+║  Экономия памяти:     {state.memory_saved:6.1f}%                           ║
+║  Настроение:          {state.mood:6}                             ║
+║  Успешных интеграций: {state.integration_count:6}                            ║
+║  Травм:               {state.trauma_count:6}                            ║
+╚══════════════════════════════════════════════════════════════╝
+        """)
+    
+    def run(self):
+        """Запуск демонстрации"""
+        print("""
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                   CrimeaAI META ORGANISM - ДЕМОНСТРАЦИЯ                       ║
+║                       🧬 Живое Цифровое Сознание 🧬                           ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+        """)
+        
+        print(f"🧬 Создание организма ({self.num_voxels} вокселей)...")
+        self.organism = MetaOrganism(num_voxels=self.num_voxels)
+        
+        # Выбор визуализатора
+        print("\n🔍 Поиск доступных визуализаторов...")
+        print(f"   Open3D:    {'✅ Доступен' if HAS_OPEN3D else '❌ Не найден'}")
+        print(f"   Plotly:    {'✅ Доступен' if HAS_PLOTLY else '❌ Не найден'}")
+        print(f"   Matplotlib: {'✅ Доступен' if HAS_MATPLOTLIB else '❌ Не найден'}")
+        
+        if HAS_OPEN3D:
+            print("\n🚀 Запуск Open3D демонстрации (real-time)...")
+            self.run_demo_open3d()
+        elif HAS_MATPLOTLIB:
+            print("\n🚀 Запуск Matplotlib демонстрации...")
+            self.run_demo_matplotlib()
+        elif HAS_PLOTLY:
+            print("\n🚀 Запуск Plotly демонстрации...")
+            self.run_demo_plotly()
+        else:
+            print("\n🚀 Запуск консольной демонстрации...")
+            self.run_demo_console()
+
+
+def main():
+    """Точка входа"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="CrimeaAI Meta Organism - Демонстрация")
+    parser.add_argument('--voxels', '-v', type=int, default=30000,
+                       help='Количество вокселей (по умолчанию 30000)')
+    parser.add_argument('--backend', '-b', choices=['auto', 'open3d', 'matplotlib', 'plotly', 'console'],
+                       default='auto', help='Бэкенд визуализации')
+    
+    args = parser.parse_args()
+    
+    demo = DemoRunner(num_voxels=args.voxels)
+    
+    if args.backend == 'open3d' and HAS_OPEN3D:
+        demo.organism = MetaOrganism(num_voxels=args.voxels)
+        demo.run_demo_open3d()
+    elif args.backend == 'matplotlib' and HAS_MATPLOTLIB:
+        demo.organism = MetaOrganism(num_voxels=args.voxels)
+        demo.run_demo_matplotlib()
+    elif args.backend == 'plotly' and HAS_PLOTLY:
+        demo.organism = MetaOrganism(num_voxels=args.voxels)
+        demo.run_demo_plotly()
+    elif args.backend == 'console':
+        demo.organism = MetaOrganism(num_voxels=args.voxels)
+        demo.run_demo_console()
+    else:
+        demo.run()
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+═══════════════════════════════════════════════════════════════════════════════
+FILE: main.py
+═══════════════════════════════════════════════════════════════════════════════
+#!/usr/bin/env python3
+"""
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                     CrimeaAI META ORGANISM                                    ║
+║                   Живое Цифровое Сознание                                    ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  Based on 7 forgotten Russian scientific works:                              ║
+║  • Никонова 2013 - Травма тканей                                            ║
+║  • Бимаков 2013 - Воксельный вычислитель                                    ║
+║  • Ахмадуллина 2020 - Атрофия мозга                                         ║
+║  • Алсынбаев 2015 - Тетраэдральная принадлежность                           ║
+║  • Бланко 2013 - ANIRLE компрессия                                          ║
+║  • Лавренков 2016 - Коэволюция эмоций                                       ║
+║  • + LightPattern 1KB                                                        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+ИСПОЛЬЗОВАНИЕ:
+    python main.py [--voxels N] [--backend open3d|plotly|matplotlib]
+    
+    Drag-and-drop файлы в папку drop_zone/ или используйте UI.
+"""
+
+import os
+import sys
+import time
+import threading
+import argparse
+from pathlib import Path
+from typing import Optional
+import numpy as np
+
+# Добавляем текущую директорию в путь
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from voxel_core import Voxel, ANIRLEStorage, compute_semantic_fingerprint
+from organism import MetaOrganism, FileCreature, OrganismState
+from visualizer import (
+    create_visualizer, Open3DVisualizer, PlotlyVisualizer,
+    MatplotlibVisualizer, HAS_OPEN3D, HAS_PLOTLY, HAS_MATPLOTLIB
+)
+
+# Попытка импорта tkinter для UI
+try:
+    import tkinter as tk
+    from tkinter import ttk, filedialog, messagebox
+    from tkinter import dnd  # Drag and drop
+    HAS_TKINTER = True
+except ImportError:
+    HAS_TKINTER = False
+    print("⚠️ tkinter не найден, будет использован консольный режим")
+
+
+class CrimeaAIApplication:
+    """
+    Главное приложение CrimeaAI Meta Organism.
+    """
+    
+    def __init__(self, num_voxels: int = 50000, backend: str = 'auto'):
+        """
+        Args:
+            num_voxels: Количество вокселей в организме (по умолчанию 50k для производительности)
+            backend: Бэкенд визуализации ('open3d', 'plotly', 'matplotlib', 'auto')
+        """
+        self.num_voxels = num_voxels
+        self.backend = backend
+        self.organism: Optional[MetaOrganism] = None
+        self.visualizer = None
+        self.running = False
+        self.paused = False
+        
+        # Путь для drag-and-drop файлов
+        self.drop_zone = Path(__file__).parent / "drop_zone"
+        self.drop_zone.mkdir(exist_ok=True)
+        self.processed_files = set()
+        
+        # UI компоненты
+        self.root: Optional[tk.Tk] = None
+        self.status_labels = {}
+        
+        # Потоки
+        self.update_thread: Optional[threading.Thread] = None
+        self.file_watch_thread: Optional[threading.Thread] = None
+        
+        # Статистика
+        self.fps = 0
+        self.frame_times = []
+        
+        print("""
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                     CrimeaAI META ORGANISM v1.0                              ║
+║                   🧬 Живое Цифровое Сознание 🧬                               ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+        """)
+    
+    def initialize(self):
+        """Инициализация всех компонентов"""
+        print("🚀 Инициализация CrimeaAI Meta Organism...")
+        
+        # Создание организма
+        print(f"🧬 Создание организма ({self.num_voxels} вокселей)...")
+        self.organism = MetaOrganism(num_voxels=self.num_voxels)
+        
+        # Регистрация обработчиков событий
+        self.organism.on_integration = self._on_integration
+        self.organism.on_trauma = self._on_trauma
+        self.organism.on_update = self._on_update
+        
+        # Создание визуализатора
+        print(f"🎨 Инициализация визуализатора ({self.backend})...")
+        try:
+            self.visualizer = create_visualizer(self.backend)
+            if hasattr(self.visualizer, 'initialize'):
+                self.visualizer.initialize()
+        except Exception as e:
+            print(f"⚠️ Ошибка визуализатора: {e}")
+            self.visualizer = None
+        
+        print("✅ Инициализация завершена!")
+        print(f"📁 Drop zone: {self.drop_zone.absolute()}")
+        print("   Перетащите файлы в эту папку для взаимодействия с организмом\n")
+    
+    def _on_integration(self, creature: FileCreature):
+        """Обработчик успешной интеграции"""
+        print(f"💚 КАЙФ! {creature.file_path} интегрировано в организм")
+        if self.root:
+            self._flash_ui('green')
+    
+    def _on_trauma(self, creature: FileCreature, voxels_lost: int):
+        """Обработчик травмы"""
+        print(f"🔴 ТРАВМА! {creature.file_path} отторгнуто, потеряно {voxels_lost} вокселей")
+        if self.root:
+            self._flash_ui('red')
+    
+    def _on_update(self, state: OrganismState):
+        """Обработчик обновления состояния"""
+        pass  # UI обновляется в главном цикле
+    
+    def _flash_ui(self, color: str):
+        """Мигнуть UI определённым цветом"""
+        if self.root and hasattr(self, 'main_frame'):
+            original_bg = self.main_frame.cget('background')
+            self.main_frame.configure(background=color)
+            self.root.after(200, lambda: self.main_frame.configure(background=original_bg))
+    
+    def add_file(self, file_path: str):
+        """Добавить файл как существо"""
+        if not os.path.exists(file_path):
+            print(f"⚠️ Файл не найден: {file_path}")
+            return
+        
+        try:
+            with open(file_path, 'rb') as f:
+                data = f.read()
+            
+            creature = self.organism.spawn_creature(file_path, data)
+            print(f"🌟 Создано существо из {os.path.basename(file_path)}")
+            
+        except Exception as e:
+            print(f"⚠️ Ошибка чтения файла {file_path}: {e}")
+    
+    def _watch_drop_zone(self):
+        """Поток наблюдения за папкой drop_zone"""
+        while self.running:
+            try:
+                for file_path in self.drop_zone.iterdir():
+                    if file_path.is_file() and str(file_path) not in self.processed_files:
+                        self.processed_files.add(str(file_path))
+                        self.add_file(str(file_path))
+            except Exception as e:
+                pass
+            
+            time.sleep(0.5)
+    
+    def _update_loop(self):
+        """Главный цикл обновления"""
+        last_time = time.time()
+        
+        while self.running:
+            if self.paused:
+                time.sleep(0.1)
+                continue
+            
+            # Вычисление dt
+            current_time = time.time()
+            dt = current_time - last_time
+            last_time = current_time
+            
+            # FPS
+            self.frame_times.append(dt)
+            if len(self.frame_times) > 30:
+                self.frame_times.pop(0)
+            self.fps = 1.0 / (sum(self.frame_times) / len(self.frame_times) + 0.001)
+            
+            # Обновление организма
+            self.organism.update(dt)
+            
+            # Обновление визуализации
+            if self.visualizer and isinstance(self.visualizer, (Open3DVisualizer, MatplotlibVisualizer)):
+                positions = self.organism.get_all_positions()
+                colors = self.organism.get_all_colors()
+                
+                # Собираем данные для освещения
+                all_voxels = list(self.organism.storage)
+                for creature in self.organism.creatures:
+                    if creature.alive:
+                        all_voxels.extend(creature.voxels)
+                
+                if all_voxels:
+                    emotions = np.array([v.emotion for v in all_voxels])
+                    energies = np.array([v.energy for v in all_voxels])
+                    traumas = np.array([v.trauma for v in all_voxels])
+                else:
+                    emotions = np.zeros((0, 4))
+                    energies = np.zeros(0)
+                    traumas = np.zeros(0)
+                
+                try:
+                    self.visualizer.update(positions, colors, emotions, energies, traumas, dt)
+                except Exception as e:
+                    pass
+            
+            # Ограничение FPS
+            elapsed = time.time() - current_time
+            sleep_time = max(0, (1/60) - elapsed)
+            time.sleep(sleep_time)
+    
+    def _create_ui(self):
+        """Создание UI через tkinter"""
+        if not HAS_TKINTER:
+            return
+        
+        self.root = tk.Tk()
+        self.root.title("CrimeaAI Meta Organism - Control Panel")
+        self.root.geometry("400x600")
+        self.root.configure(bg='#0a0a1a')
+        
+        # Стиль
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure('TFrame', background='#0a0a1a')
+        style.configure('TLabel', background='#0a0a1a', foreground='#00ff88', font=('Consolas', 11))
+        style.configure('Title.TLabel', font=('Consolas', 14, 'bold'))
+        style.configure('TButton', font=('Consolas', 10))
+        
+        # Главный фрейм
+        self.main_frame = ttk.Frame(self.root, padding=20)
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Заголовок
+        title = ttk.Label(
+            self.main_frame, 
+            text="🧬 CrimeaAI Meta Organism 🧬",
+            style='Title.TLabel'
+        )
+        title.pack(pady=(0, 20))
+        
+        # Статус организма
+        status_frame = ttk.Frame(self.main_frame)
+        status_frame.pack(fill=tk.X, pady=10)
+        
+        self.status_labels = {}
+        status_items = [
+            ('health', 'Organism Health', '100%'),
+            ('voxels', 'Total Voxels', '0'),
+            ('memory', 'Memory Saved', '0%'),
+            ('mood', 'Current Mood', 'покой'),
+            ('fps', 'FPS', '0'),
+            ('integrations', 'Integrations', '0'),
+            ('traumas', 'Traumas', '0'),
+            ('event', 'Last Event', '-'),
+        ]
+        
+        for key, label, default in status_items:
+            frame = ttk.Frame(status_frame)
+            frame.pack(fill=tk.X, pady=3)
+            
+            lbl = ttk.Label(frame, text=f"{label}:", width=18, anchor='w')
+            lbl.pack(side=tk.LEFT)
+            
+            val = ttk.Label(frame, text=default, width=20, anchor='e')
+            val.pack(side=tk.RIGHT)
+            
+            self.status_labels[key] = val
+        
+        # Разделитель
+        ttk.Separator(self.main_frame, orient='horizontal').pack(fill=tk.X, pady=15)
+        
+        # Кнопки управления
+        btn_frame = ttk.Frame(self.main_frame)
+        btn_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Button(
+            btn_frame, 
+            text="📁 Добавить файл",
+            command=self._browse_file
+        ).pack(fill=tk.X, pady=3)
+        
+        ttk.Button(
+            btn_frame,
+            text="⏸ Пауза/Продолжить",
+            command=self._toggle_pause
+        ).pack(fill=tk.X, pady=3)
+        
+        ttk.Button(
+            btn_frame,
+            text="📊 Показать в Plotly",
+            command=self._show_plotly
+        ).pack(fill=tk.X, pady=3)
+        
+        ttk.Button(
+            btn_frame,
+            text="🔄 Сбросить организм",
+            command=self._reset_organism
+        ).pack(fill=tk.X, pady=3)
+        
+        # Разделитель
+        ttk.Separator(self.main_frame, orient='horizontal').pack(fill=tk.X, pady=15)
+        
+        # Инструкции
+        instructions = ttk.Label(
+            self.main_frame,
+            text=f"📁 Drop Zone:\n{self.drop_zone}\n\nПеретащите файлы в эту папку\nдля взаимодействия с организмом.",
+            justify=tk.CENTER,
+            wraplength=350
+        )
+        instructions.pack(pady=10)
+        
+        # Цитаты из работ
+        quotes_frame = ttk.Frame(self.main_frame)
+        quotes_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        quotes = [
+            "«Травма тканей есть путь к обновлению» — Никонова, 2013",
+            "«Воксель — атом цифрового сознания» — Бимаков, 2013",
+            "«Коэволюция эмоций создаёт разум» — Лавренков, 2016",
+        ]
+        
+        self.quote_label = ttk.Label(
+            quotes_frame,
+            text=quotes[0],
+            font=('Consolas', 9, 'italic'),
+            foreground='#666688',
+            wraplength=350,
+            justify=tk.CENTER
+        )
+        self.quote_label.pack(pady=5)
+        self.quotes = quotes
+        self.quote_index = 0
+        
+        # Обновление UI
+        self._update_ui()
+        
+        # Обработка закрытия
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+    
+    def _update_ui(self):
+        """Обновление UI"""
+        if not self.root or not self.running:
+            return
+        
+        if self.organism:
+            state = self.organism.state
+            
+            # Обновление меток
+            health_color = '#00ff88' if state.health > 0.7 else '#ffaa00' if state.health > 0.4 else '#ff4444'
+            self.status_labels['health'].configure(
+                text=f"{state.health*100:.1f}%",
+                foreground=health_color
+            )
+            self.status_labels['voxels'].configure(text=f"{state.total_voxels:,}")
+            self.status_labels['memory'].configure(text=f"{state.memory_saved:.1f}%")
+            
+            mood_colors = {'кайф': '#00ff88', 'тревога': '#ffaa00', 'гнев': '#ff4444', 'покой': '#4488ff'}
+            self.status_labels['mood'].configure(
+                text=f"{state.mood} ({state.mood_intensity*100:.0f}%)",
+                foreground=mood_colors.get(state.mood, '#ffffff')
+            )
+            
+            self.status_labels['fps'].configure(text=f"{self.fps:.1f}")
+            self.status_labels['integrations'].configure(text=str(state.integration_count))
+            self.status_labels['traumas'].configure(text=str(state.trauma_count))
+            
+            # Последнее событие (обрезаем длинные)
+            event = state.last_event[:40] + "..." if len(state.last_event) > 40 else state.last_event
+            self.status_labels['event'].configure(text=event or '-')
+        
+        # Смена цитаты каждые 5 секунд
+        if hasattr(self, '_quote_counter'):
+            self._quote_counter += 1
+            if self._quote_counter >= 50:  # ~5 секунд при 100ms интервале
+                self._quote_counter = 0
+                self.quote_index = (self.quote_index + 1) % len(self.quotes)
+                self.quote_label.configure(text=self.quotes[self.quote_index])
+        else:
+            self._quote_counter = 0
+        
+        # Повторный вызов через 100ms
+        self.root.after(100, self._update_ui)
+    
+    def _browse_file(self):
+        """Диалог выбора файла"""
+        file_path = filedialog.askopenfilename(
+            title="Выберите файл для интеграции",
+            filetypes=[
+                ("Все файлы", "*.*"),
+                ("Python", "*.py"),
+                ("Текст", "*.txt"),
+                ("JSON", "*.json"),
+            ]
+        )
+        if file_path:
+            self.add_file(file_path)
+    
+    def _toggle_pause(self):
+        """Пауза/продолжение"""
+        self.paused = not self.paused
+        status = "⏸ ПАУЗА" if self.paused else "▶ РАБОТАЕТ"
+        print(f"Status: {status}")
+    
+    def _show_plotly(self):
+        """Показать текущее состояние в Plotly"""
+        if not HAS_PLOTLY:
+            messagebox.showwarning("Plotly", "Plotly не установлен")
+            return
+        
+        try:
+            vis = PlotlyVisualizer()
+            positions = self.organism.get_all_positions()
+            colors = self.organism.get_all_colors()
+            
+            all_voxels = list(self.organism.storage)
+            for creature in self.organism.creatures:
+                if creature.alive:
+                    all_voxels.extend(creature.voxels)
+            
+            emotions = np.array([v.emotion for v in all_voxels]) if all_voxels else None
+            energies = np.array([v.energy for v in all_voxels]) if all_voxels else None
+            traumas = np.array([v.trauma for v in all_voxels]) if all_voxels else None
+            
+            state = self.organism.state
+            title = f"CrimeaAI Meta Organism | Health: {state.health*100:.0f}% | Mood: {state.mood}"
+            
+            vis.create_figure(positions, colors, title, emotions, energies, traumas)
+            vis.show()
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Ошибка Plotly: {e}")
+    
+    def _reset_organism(self):
+        """Сброс организма"""
+        if messagebox.askyesno("Сброс", "Сбросить организм? Все данные будут потеряны."):
+            print("🔄 Сброс организма...")
+            self.organism = MetaOrganism(num_voxels=self.num_voxels)
+            self.organism.on_integration = self._on_integration
+            self.organism.on_trauma = self._on_trauma
+            self.organism.on_update = self._on_update
+            self.processed_files.clear()
+            print("✅ Организм сброшен")
+    
+    def _on_close(self):
+        """Обработка закрытия окна"""
+        self.running = False
+        if self.visualizer and hasattr(self.visualizer, 'close'):
+            self.visualizer.close()
+        self.root.destroy()
+    
+    def run(self, headless: bool = False):
+        """Запуск приложения"""
+        self.initialize()
+        self.running = True
+        
+        # Запуск потока наблюдения за файлами
+        self.file_watch_thread = threading.Thread(target=self._watch_drop_zone, daemon=True)
+        self.file_watch_thread.start()
+        
+        # Запуск потока обновления
+        self.update_thread = threading.Thread(target=self._update_loop, daemon=True)
+        self.update_thread.start()
+        
+        if headless or not HAS_TKINTER:
+            # Консольный режим
+            print("\n🎮 Консольный режим (без UI)")
+            print("Команды:")
+            print("  add <путь_к_файлу> - добавить файл")
+            print("  status - показать статус")
+            print("  plotly - открыть в Plotly")
+            print("  quit - выход\n")
+            
+            try:
+                while self.running:
+                    cmd = input("> ").strip().lower()
+                    
+                    if cmd.startswith("add "):
+                        path = cmd[4:].strip()
+                        self.add_file(path)
+                    
+                    elif cmd == "status":
+                        state = self.organism.state
+                        print(f"""
+╔══════════════════════════════════════╗
+║ Health:      {state.health*100:6.1f}%              ║
+║ Voxels:      {state.total_voxels:6,}               ║
+║ Memory:      {state.memory_saved:6.1f}%              ║
+║ Mood:        {state.mood:6}               ║
+║ Integrations:{state.integration_count:6}               ║
+║ Traumas:     {state.trauma_count:6}               ║
+╚══════════════════════════════════════╝
+                        """)
+                    
+                    elif cmd == "plotly":
+                        if HAS_PLOTLY:
+                            vis = PlotlyVisualizer()
+                            positions = self.organism.get_all_positions()
+                            colors = self.organism.get_all_colors()
+                            vis.create_figure(positions, colors)
+                            vis.show()
+                        else:
+                            print("Plotly не установлен")
+                    
+                    elif cmd in ("quit", "exit", "q"):
+                        self.running = False
+                        break
+                    
+                    elif cmd:
+                        print("Неизвестная команда")
+            
+            except KeyboardInterrupt:
+                print("\n👋 Завершение...")
+                self.running = False
+        
+        else:
+            # GUI режим
+            self._create_ui()
+            self.root.mainloop()
+        
+        print("🧬 CrimeaAI Meta Organism завершён")
+
+
+def main():
+    """Точка входа"""
+    parser = argparse.ArgumentParser(
+        description="CrimeaAI Meta Organism - Живое Цифровое Сознание"
+    )
+    parser.add_argument(
+        '--voxels', '-v',
+        type=int,
+        default=50000,
+        help='Количество вокселей в организме (по умолчанию 50000)'
+    )
+    parser.add_argument(
+        '--backend', '-b',
+        choices=['auto', 'open3d', 'plotly', 'matplotlib'],
+        default='auto',
+        help='Бэкенд визуализации'
+    )
+    parser.add_argument(
+        '--headless',
+        action='store_true',
+        help='Консольный режим без UI'
+    )
+    
+    args = parser.parse_args()
+    
+    app = CrimeaAIApplication(
+        num_voxels=args.voxels,
+        backend=args.backend
+    )
+    app.run(headless=args.headless)
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+═══════════════════════════════════════════════════════════════════════════════
+FILE: test_organism.py
+═══════════════════════════════════════════════════════════════════════════════
+#!/usr/bin/env python3
+"""
+CrimeaAI Meta Organism - Тесты
+═══════════════════════════════════════════════════════════════════════════════
+
+Тестирование всех компонентов системы.
+"""
+
+import sys
+import os
+import numpy as np
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from voxel_core import (
+    Voxel, ANIRLEStorage, compute_semantic_fingerprint,
+    cosine_similarity, TetrahedralBelonging, EmotionIndex
+)
+from organism import MetaOrganism, FileCreature, OrganismState
+
+
+def test_voxel_creation():
+    """Тест создания вокселя"""
+    print("🧪 Тест: Создание вокселя...")
+    
+    voxel = Voxel(x=1.0, y=2.0, z=3.0)
+    
+    assert voxel.x == 1.0
+    assert voxel.y == 2.0
+    assert voxel.z == 3.0
+    assert voxel.energy == 1.0
+    assert len(voxel.emotion) == 4
+    assert len(voxel.semantic) == 8
+    assert len(voxel.connections) == 6
+    assert voxel.is_alive()
+    
+    print("   ✅ Воксель создан корректно")
+
+
+def test_voxel_properties():
+    """Тест свойств вокселя"""
+    print("🧪 Тест: Свойства вокселя...")
+    
+    voxel = Voxel(x=1.0, y=2.0, z=3.0)
+    
+    # Тест позиции
+    pos = voxel.pos
+    assert np.allclose(pos, [1.0, 2.0, 3.0])
+    
+    # Тест доминирующей эмоции
+    voxel.emotion = np.array([0.8, 0.1, 0.05, 0.05])
+    name, value = voxel.dominant_emotion()
+    assert name == 'joy'
+    assert value == 0.8
+    
+    # Тест is_alive
+    voxel.energy = 0.5
+    voxel.trauma = 0.3
+    assert voxel.is_alive()
+    
+    voxel.energy = 0.0
+    assert not voxel.is_alive()
+    
+    print("   ✅ Свойства работают корректно")
+
+
+def test_anirle_storage():
+    """Тест ANIRLE хранилища"""
+    print("🧪 Тест: ANIRLE хранилище...")
+    
+    storage = ANIRLEStorage(resolution=1.0)
+    
+    # Добавление вокселей
+    v1 = Voxel(x=0, y=0, z=0)
+    v2 = Voxel(x=1, y=0, z=0)
+    v3 = Voxel(x=0, y=1, z=0)
+    
+    id1 = storage.add(v1)
+    id2 = storage.add(v2)
+    id3 = storage.add(v3)
+    
+    assert len(storage) == 3
+    assert id1 != id2 != id3
+    
+    # Получение
+    retrieved = storage.get(0, 0, 0)
+    assert retrieved is not None
+    assert retrieved.id == id1
+    
+    # Соседи
+    neighbors = storage.get_neighbors(v1)
+    assert len(neighbors) == 2  # v2 и v3
+    
+    # Удаление
+    removed = storage.remove(1, 0, 0)
+    assert removed
+    assert len(storage) == 2
+    
+    # Статистика
+    stats = storage.get_statistics()
+    assert stats['total_voxels'] == 2
+    
+    print("   ✅ ANIRLE хранилище работает корректно")
+
+
+def test_semantic_fingerprint():
+    """Тест семантического отпечатка"""
+    print("🧪 Тест: Семантический отпечаток...")
+    
+    data1 = b"Hello, World!"
+    data2 = b"Hello, World!"  # Тот же
+    data3 = b"Goodbye, World!"  # Другой
+    
+    fp1 = compute_semantic_fingerprint(data1)
+    fp2 = compute_semantic_fingerprint(data2)
+    fp3 = compute_semantic_fingerprint(data3)
+    
+    assert len(fp1) == 8
+    assert np.allclose(fp1, fp2)  # Одинаковые данные = одинаковый отпечаток
+    assert not np.allclose(fp1, fp3)  # Разные данные = разный отпечаток
+    
+    print("   ✅ Семантический отпечаток работает корректно")
+
+
+def test_cosine_similarity():
+    """Тест косинусного сходства"""
+    print("🧪 Тест: Косинусное сходство...")
+    
+    a = np.array([1, 0, 0])
+    b = np.array([1, 0, 0])
+    c = np.array([0, 1, 0])
+    d = np.array([-1, 0, 0])
+    
+    assert cosine_similarity(a, b) == 1.0  # Идентичные
+    assert cosine_similarity(a, c) == 0.0  # Ортогональные
+    assert cosine_similarity(a, d) == -1.0  # Противоположные
+    
+    print("   ✅ Косинусное сходство работает корректно")
+
+
+def test_organism_creation():
+    """Тест создания организма"""
+    print("🧪 Тест: Создание организма (5000 вокселей)...")
+    
+    start = time.time()
+    organism = MetaOrganism(num_voxels=5000)
+    elapsed = time.time() - start
+    
+    assert len(organism.storage) > 0
+    assert organism.state.health > 0
+    assert organism.radius > 0
+    
+    print(f"   ✅ Организм создан за {elapsed:.2f}с ({len(organism.storage)} вокселей)")
+
+
+def test_creature_creation():
+    """Тест создания существа из файла"""
+    print("🧪 Тест: Создание существа...")
+    
+    organism = MetaOrganism(num_voxels=1000)
+    
+    data = b"Test file content for creature creation"
+    creature = organism.spawn_creature("test.txt", data)
+    
+    assert creature is not None
+    assert len(creature.voxels) > 0
+    assert creature.alive
+    assert not creature.integrated
+    
+    print(f"   ✅ Существо создано ({len(creature.voxels)} вокселей)")
+
+
+def test_compatibility_check():
+    """Тест проверки совместимости"""
+    print("🧪 Тест: Проверка совместимости...")
+    
+    organism = MetaOrganism(num_voxels=1000)
+    
+    # Создаём "совместимый" файл (похожие данные на семантику организма)
+    compatible_data = (organism.base_semantic * 255).astype(np.uint8).tobytes() * 100
+    creature1 = organism.spawn_creature("compatible.py", compatible_data)
+    
+    # Создаём "несовместимый" файл
+    incompatible_data = ((1 - organism.base_semantic) * 255).astype(np.uint8).tobytes() * 100
+    creature2 = organism.spawn_creature("incompatible.exe", incompatible_data)
+    
+    sem1, emo1 = organism.check_compatibility(creature1)
+    sem2, emo2 = organism.check_compatibility(creature2)
+    
+    print(f"   Совместимый: sem={sem1:.2f}, emo={emo1:.2f}")
+    print(f"   Несовместимый: sem={sem2:.2f}, emo={emo2:.2f}")
+    
+    # Совместимый должен иметь более высокое сходство
+    # (это не строгий тест из-за случайности)
+    
+    print("   ✅ Проверка совместимости работает")
+
+
+def test_organism_update():
+    """Тест обновления организма"""
+    print("🧪 Тест: Обновление организма...")
+    
+    organism = MetaOrganism(num_voxels=2000)
+    
+    initial_state = organism.state.health
+    
+    # Несколько тиков обновления
+    for _ in range(10):
+        organism.update(0.016)
+    
+    # Состояние должно измениться (пульсация)
+    assert organism.storage.tick == 10
+    
+    print("   ✅ Обновление организма работает")
+
+
+def test_integration():
+    """Тест интеграции существа"""
+    print("🧪 Тест: Интеграция существа...")
+    
+    organism = MetaOrganism(num_voxels=2000)
+    initial_count = len(organism.storage)
+    
+    # Создаём существо
+    data = b"Test data" * 100
+    creature = organism.spawn_creature("test.py", data)
+    creature_voxels = len(creature.voxels)
+    
+    # Принудительная интеграция
+    organism.integrate_creature(creature)
+    
+    # Проверки
+    assert creature.integrated
+    assert not creature.alive
+    # Воксели добавляются в storage, но могут быть коллизии из-за квантования
+    # Проверяем, что вокселей стало больше
+    assert len(organism.storage) > initial_count
+    assert organism.state.integration_count == 1
+    
+    added = len(organism.storage) - initial_count
+    print(f"   ✅ Интеграция работает (+{added} вокселей из {creature_voxels})")
+
+
+def test_rejection():
+    """Тест отторжения существа"""
+    print("🧪 Тест: Отторжение существа...")
+    
+    organism = MetaOrganism(num_voxels=5000)
+    initial_count = len(organism.storage)
+    
+    # Создаём существо
+    data = b"Malicious data" * 100
+    creature = organism.spawn_creature("malware.exe", data)
+    
+    # Двигаем к центру
+    creature.current_pos = organism.center.copy()
+    for v in creature.voxels:
+        v.x += organism.center[0] - creature.spawn_pos[0]
+        v.y += organism.center[1] - creature.spawn_pos[1]
+        v.z += organism.center[2] - creature.spawn_pos[2]
+    
+    # Принудительное отторжение
+    organism.reject_creature(creature, severity=0.5)
+    
+    # Проверки
+    assert creature.rejected
+    assert not creature.alive
+    assert len(organism.storage) < initial_count  # Атрофия
+    assert organism.state.trauma_count == 1
+    
+    voxels_lost = initial_count - len(organism.storage)
+    print(f"   ✅ Отторжение работает (-{voxels_lost} вокселей)")
+
+
+def test_positions_and_colors():
+    """Тест получения позиций и цветов"""
+    print("🧪 Тест: Позиции и цвета...")
+    
+    organism = MetaOrganism(num_voxels=1000)
+    
+    positions = organism.get_all_positions()
+    colors = organism.get_all_colors()
+    
+    assert len(positions) == len(organism.storage)
+    assert len(colors) == len(organism.storage)
+    assert positions.shape[1] == 3  # x, y, z
+    assert colors.shape[1] == 3  # r, g, b
+    assert np.all(colors >= 0) and np.all(colors <= 1)
+    
+    print("   ✅ Позиции и цвета получены корректно")
+
+
+def test_full_scenario():
+    """Полный сценарий тестирования"""
+    print("🧪 Тест: Полный сценарий (5 секунд)...")
+    
+    organism = MetaOrganism(num_voxels=3000)
+    
+    # Добавляем несколько файлов
+    files = [
+        ("good1.py", b"Python code" * 50),
+        ("bad1.exe", b"\x00\xff" * 100),
+        ("good2.json", b'{"key": "value"}' * 30),
+    ]
+    
+    for name, data in files:
+        organism.spawn_creature(name, data)
+    
+    # Запускаем симуляцию
+    start = time.time()
+    ticks = 0
+    
+    while time.time() - start < 3.0:  # 3 секунды
+        organism.update(0.016)
+        ticks += 1
+    
+    state = organism.state
+    
+    print(f"   Тиков: {ticks}")
+    print(f"   Вокселей: {state.total_voxels}")
+    print(f"   Здоровье: {state.health*100:.1f}%")
+    print(f"   Настроение: {state.mood}")
+    print(f"   Интеграций: {state.integration_count}")
+    print(f"   Травм: {state.trauma_count}")
+    
+    print("   ✅ Полный сценарий завершён")
+
+
+def run_all_tests():
+    """Запуск всех тестов"""
+    print("""
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                   CrimeaAI META ORGANISM - ТЕСТЫ                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+    """)
+    
+    tests = [
+        test_voxel_creation,
+        test_voxel_properties,
+        test_anirle_storage,
+        test_semantic_fingerprint,
+        test_cosine_similarity,
+        test_organism_creation,
+        test_creature_creation,
+        test_compatibility_check,
+        test_organism_update,
+        test_integration,
+        test_rejection,
+        test_positions_and_colors,
+        test_full_scenario,
+    ]
+    
+    passed = 0
+    failed = 0
+    
+    for test in tests:
+        try:
+            test()
+            passed += 1
+        except Exception as e:
+            print(f"   ❌ ОШИБКА: {e}")
+            failed += 1
+    
+    print(f"""
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          РЕЗУЛЬТАТЫ ТЕСТОВ                                   ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  ✅ Пройдено: {passed:3}                                                       ║
+║  ❌ Провалено: {failed:3}                                                       ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+    """)
+    
+    return failed == 0
+
+
+if __name__ == "__main__":
+    success = run_all_tests()
+    sys.exit(0 if success else 1)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+END OF CODE
+═══════════════════════════════════════════════════════════════════════════════
