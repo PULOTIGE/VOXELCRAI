@@ -43,12 +43,10 @@ dependencies {
     // 📦 Fabric API модули
     modImplementation("net.fabricmc.fabric-api:fabric-api:$fabricVersion")
     
-    // 🔧 Опциональные зависимости для совместимости
-    // Iris Shaders (runtime only - мод работает с шейдерами Iris)
-    modCompileOnly("maven.modrinth:iris:1.7.3+1.21.1")
-    
-    // Sodium (оптимизация рендера)
-    modCompileOnly("maven.modrinth:sodium:mc1.21.1-0.6.0-beta.2")
+    // 🔧 Опциональные зависимости закомментированы
+    // Iris и Sodium подключаются пользователем отдельно
+    // modCompileOnly("maven.modrinth:iris:1.7.3+1.21.1")
+    // modCompileOnly("maven.modrinth:sodium:mc1.21.1-0.6.0-beta.2")
     
     // 🧪 Тестирование
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
@@ -57,6 +55,7 @@ dependencies {
 tasks {
     processResources {
         inputs.property("version", project.version)
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
         
         filesMatching("fabric.mod.json") {
             expand(
@@ -64,11 +63,6 @@ tasks {
                 "minecraft_version" to minecraftVersion,
                 "loader_version" to loaderVersion
             )
-        }
-        
-        // 📦 Копируем шейдер-пак в ресурсы
-        from("src/main/resources/assets/voxelcrai/shaders") {
-            into("assets/voxelcrai/shaders")
         }
     }
     

@@ -159,29 +159,30 @@ public class VoxelCraiConfigScreen extends Screen {
      * 🔢 Слайдер количества паттернов
      */
     private static class PatternCountSlider extends SliderWidget {
-        private int value;
+        private int patternValue;
         
         public PatternCountSlider(int x, int y, int width, int height, int initialValue) {
             super(x, y, width, height, Text.empty(), valueToSlider(initialValue));
-            this.value = initialValue;
+            this.patternValue = initialValue;
             updateMessage();
         }
         
         @Override
         protected void updateMessage() {
-            setMessage(Text.literal(String.format("🔢 Паттерны: %,d", value)));
+            setMessage(Text.literal(String.format("🔢 Паттерны: %,d", patternValue)));
         }
         
         @Override
         protected void applyValue() {
-            this.value = sliderToValue(this.value);
+            this.patternValue = sliderToValue(this.value);
+            updateMessage();
         }
         
-        public int getValue() { return value; }
+        public int getValue() { return patternValue; }
         
         public void setValue(int value) {
-            this.value = Math.max(1000, Math.min(100000, value));
-            this.value = valueToSlider(this.value);
+            this.patternValue = Math.max(1000, Math.min(100000, value));
+            this.value = valueToSlider(this.patternValue);
             updateMessage();
         }
         
@@ -199,29 +200,31 @@ public class VoxelCraiConfigScreen extends Screen {
      * 🔮 Слайдер SH bands
      */
     private static class ShBandsSlider extends SliderWidget {
-        private int value;
+        private int bandsValue;
         
         public ShBandsSlider(int x, int y, int width, int height, int initialValue) {
             super(x, y, width, height, Text.empty(), (initialValue - 3) / 2.0);
-            this.value = initialValue;
+            this.bandsValue = initialValue;
             updateMessage();
         }
         
         @Override
         protected void updateMessage() {
-            int coeffCount = value * value;  // 3 bands = 9, 4 bands = 16, 5 bands = 25
-            setMessage(Text.literal(String.format("🔮 SH Bands: %d (%d коэфф.)", value, coeffCount)));
+            int coeffCount = bandsValue * bandsValue;  // 3 bands = 9, 4 bands = 16, 5 bands = 25
+            setMessage(Text.literal(String.format("🔮 SH Bands: %d (%d коэфф.)", bandsValue, coeffCount)));
         }
         
         @Override
         protected void applyValue() {
-            this.value = (int) Math.round(this.value * 2.0 + 3.0);
+            this.bandsValue = (int) Math.round(this.value * 2.0 + 3.0);
+            updateMessage();
         }
         
-        public int getValue() { return value; }
+        public int getValue() { return bandsValue; }
         
         public void setValue(int value) {
-            this.value = Math.max(3, Math.min(5, value));
+            this.bandsValue = Math.max(3, Math.min(5, value));
+            this.value = (bandsValue - 3) / 2.0;
             updateMessage();
         }
     }
@@ -231,29 +234,31 @@ public class VoxelCraiConfigScreen extends Screen {
      */
     private static class IntensitySlider extends SliderWidget {
         private final String name;
-        private float value;
+        private float intensityValue;
         
         public IntensitySlider(int x, int y, int width, int height, String name, float initialValue) {
             super(x, y, width, height, Text.empty(), initialValue / 2.0);
             this.name = name;
-            this.value = initialValue;
+            this.intensityValue = initialValue;
             updateMessage();
         }
         
         @Override
         protected void updateMessage() {
-            setMessage(Text.literal(String.format("💡 %s: %.0f%%", name, value * 100)));
+            setMessage(Text.literal(String.format("💡 %s: %.0f%%", name, intensityValue * 100)));
         }
         
         @Override
         protected void applyValue() {
-            this.value = (float) (this.value * 2.0);
+            this.intensityValue = (float) (this.value * 2.0);
+            updateMessage();
         }
         
-        public float getValue() { return value; }
+        public float getValue() { return intensityValue; }
         
         public void setValue(float value) {
-            this.value = Math.max(0, Math.min(2, value));
+            this.intensityValue = Math.max(0, Math.min(2, value));
+            this.value = intensityValue / 2.0;
             updateMessage();
         }
     }

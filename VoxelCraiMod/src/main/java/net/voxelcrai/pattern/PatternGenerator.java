@@ -135,7 +135,7 @@ public class PatternGenerator {
                     if (state.isAir()) continue;
                     
                     // 🔮 Генерируем паттерн для непрозрачных/полупрозрачных блоков
-                    if (!state.isTransparent(chunk, pos)) {
+                    if (!state.isTransparent()) {
                         LightPattern1KB pattern = generatePatternForBlock(chunk, pos, state);
                         patterns.add(pattern);
                         
@@ -182,8 +182,13 @@ public class PatternGenerator {
         pattern.setShCoefficients4Bands(shCoeffs);
         
         // 💡 Прямое освещение (от неба/солнца)
-        float skyLight = chunk.getLightLevel(net.minecraft.world.LightType.SKY, pos) / 15.0f;
-        float blockLight = chunk.getLightLevel(net.minecraft.world.LightType.BLOCK, pos) / 15.0f;
+        // В 1.21.3+ используем World для получения уровня освещения
+        float skyLight = 0.8f;  // Default sky light
+        float blockLight = 0.0f;
+        if (chunk.getWorld() != null) {
+            skyLight = chunk.getWorld().getLightLevel(net.minecraft.world.LightType.SKY, pos) / 15.0f;
+            blockLight = chunk.getWorld().getLightLevel(net.minecraft.world.LightType.BLOCK, pos) / 15.0f;
+        }
         
         pattern.setDirectLight(skyLight, skyLight * 0.9f, skyLight * 0.8f);
         
@@ -306,7 +311,7 @@ public class PatternGenerator {
             BlockState state = chunk.getBlockState(checkPos);
             
             if (!state.isAir()) {
-                if (state.isTransparent(chunk, checkPos)) {
+                if (state.isTransparent()) {
                     visibility *= 0.7f;  // Полупрозрачный
                 } else {
                     visibility *= 0.1f;  // Непрозрачный = тень
@@ -328,9 +333,9 @@ public class PatternGenerator {
         for (Direction dir : Direction.values()) {
             BlockPos neighbor = pos.offset(dir);
             
-            if (isInChunk(chunk, neighbor)) {
-                float skyLight = chunk.getLightLevel(net.minecraft.world.LightType.SKY, neighbor) / 15.0f;
-                float blockLight = chunk.getLightLevel(net.minecraft.world.LightType.BLOCK, neighbor) / 15.0f;
+            if (isInChunk(chunk, neighbor) && chunk.getWorld() != null) {
+                float skyLight = chunk.getWorld().getLightLevel(net.minecraft.world.LightType.SKY, neighbor) / 15.0f;
+                float blockLight = chunk.getWorld().getLightLevel(net.minecraft.world.LightType.BLOCK, neighbor) / 15.0f;
                 totalLight += Math.max(skyLight, blockLight);
                 samples++;
             }
@@ -357,7 +362,7 @@ public class PatternGenerator {
                     
                     if (isInChunk(chunk, neighbor)) {
                         BlockState state = chunk.getBlockState(neighbor);
-                        if (!state.isAir() && !state.isTransparent(chunk, neighbor)) {
+                        if (!state.isAir() && !state.isTransparent()) {
                             occluded++;
                         }
                     }
@@ -484,7 +489,7 @@ public class PatternGenerator {
         
         return pos.getX() >= startX && pos.getX() < startX + 16 &&
                pos.getZ() >= startZ && pos.getZ() < startZ + 16 &&
-               pos.getY() >= chunk.getBottomY() && pos.getY() < chunk.getTopY();
+               pos.getY() >= chunk.getBottomY() && pos.getY() < chunk.getTopYInclusive();
     }
     
     /**

@@ -18,9 +18,6 @@
   "entrypoints": {
     "client": [
       "net.voxelcrai.mod.VoxelCraiMod"
-    ],
-    "modmenu": [
-      "net.voxelcrai.mod.VoxelCraiModMenu"
     ]
   },
   "mixins": [
