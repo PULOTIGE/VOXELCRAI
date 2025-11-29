@@ -1,130 +1,79 @@
 # Architecture Documentation
 
-## Adaptive Entity Engine v1.0
+## VOXELCRAI
 
 ### Overview
 
-Adaptive Entity Engine v1.0 — высокопроизводительный воксельный движок на Rust с поддержкой Vulkan через wgpu, ECS системой, эволюционными алгоритмами и защитой ArchGuard Enterprise.
+VOXELCRAI — рендерер сознательного воксельного мира. Движок работает на чистом wgpu/winit, комбинирует физику вокселей, эволюцию генома и управляющее сознание, которое наблюдает за состоянием мира и изменяет его энергию.
 
-### Core Components
+### Data & Simulation Layer
 
-#### 1. Voxel System (`src/voxel.rs`)
+#### Voxel System (`src/voxel.rs`)
 
-Воксель размером 9-13 КБ содержит:
+- Воксель ~9–13 КБ: FP64 энергия/эмоции, 10 каналов восприятия (FP16), INT8 физика, packed флаги, геном до 10 концептов, echo+resonance, метаданные.
+- `VoxelWorld` генерирует террейн по синусоидальному шуму, поддерживает до `max_voxels` сущностей, обновляет энергию, эмоции и вектор скорости по таймеру.
+- `WorldMetrics` агрегирует среднее/максимальное значение энергии, энтропию распределения, центроид, холодную и горячую точки.
+- Операции: `affect_cluster` (локальное усиление/приглушение энергии), `embed_concept`, `spawn_voxel`.
 
-- **FP64 (8 bytes each)**: энергия, эмоции (валентность, возбуждение, доминирование)
-- **FP16 (2 bytes each)**: 10 типов восприятия (визуальное, слуховое, тактильное, и др.)
-- **INT8 (1 byte each)**: физические свойства (скорость, ускорение, температура, давление, плотность, эластичность, трение, вязкость)
-- **INT4 (packed)**: флаги состояния и материалов
-- **Геном**: до 10 концептов (строки, переменный размер)
-- **Echo + Resonance**: 16 байт echo + f16 resonance
-- **Позиция**: i32[3] (12 байт)
-- **Метаданные**: HashMap<String, String> (переменный размер)
+#### Evolution (`src/evolution.rs`)
 
-#### 2. Evolution System (`src/evolution.rs`)
+- Классический GA: crossover, mutate, fitness (энергия + резонанс + эмоции + разнообразие восприятия).
+- Применяется каждые 2 секунды симуляции ко второй половине популяции.
 
-NextGen Evolution реализует:
+#### Consciousness (`src/consciousness.rs`)
 
-- **Combine (Crossover)**: объединение геномов двух родителей
-- **Mutate**: мутация генома (добавление/удаление/изменение концептов)
-- **Fitness**: расчёт приспособленности на основе энергии, генома, резонанса, восприятия и эмоций
+- `ConsciousnessCore` хранит настроение, любопытство, эмпатию и стабилизацию.
+- Метод `think` генерирует `ConsciousnessPulse`: набор действий (ignite, calm, trauma toggle, seed concept) и телеметрию.
+- Метрики синхронизируются с ArchGuard (empathy gauge).
 
-#### 3. Lighting System (`src/lighting.rs`)
+#### Simulation (`src/simulation.rs`)
 
-LightPattern — структура ровно 1000 байт:
+- Координирует `VoxelWorld`, `LightingSystem`, `EvolutionEngine` и `ConsciousnessCore`.
+- Каждый кадр: update мира → получить `WorldMetrics` → запросить действия сознания → применить → обновить инстансы для GPU.
+- `SimulationMetrics` отдаёт статусы для логгера/диагностики.
 
-- Direct/indirect: f16 (4 байта)
-- Spherical Harmonics: i8[256] (256 байт)
-- Материалы: u8[512] (512 байт)
-- AO/reflection/refraction/emission: f16 + properties (228 байт)
+### Rendering Layer
 
-#### 4. Rendering System (`src/renderer.rs`)
+#### Camera (`src/camera.rs`)
 
-- **Primary**: wgpu с Vulkan backend
-- **Fallback**: HIP/ROCm для AMD Vega 20 (заглушка, требует интеграции)
-- **Point Cloud**: поддержка до 1.5 миллиардов точек
-- **Color Mapping**: цвет по энергии (жёлтый = максимум)
+- `Camera` хранит позицию, yaw/pitch, проекцию.
+- `CameraController` обрабатывает события winit (WASD, Space/Shift, колесо, ПКМ).
+- `CameraUniform` — матрица `view_proj`.
 
-#### 5. ArchGuard Enterprise (`src/archguard.rs`)
+#### Renderer (`src/renderer.rs`)
 
-Система защиты включает:
+- Создаёт `Surface<'static>` через `Arc<Window>`, выбирает sRGB формат и `PresentMode::Fifo/Mailbox`.
+- Пайплайн: instanced cube mesh (24 вертекса, 36 индексов), uniform с матрицей, Instanced buffer (`InstanceRaw`: позиция, масштаб, цвет, энергия).
+- Пересоздаёт depth-текстуру при изменении размеров окна.
+- Шейдер `shaders/voxel.wgsl`: вычисляет world-space позицию, освещает нормаль и добавляет свечение пропорционально энергии.
 
-- **Circuit Breaker**: защита от каскадных сбоев
-- **Prometheus Metrics**: счётчики, гистограммы, gauges
-- **Empathy Ratio**: коэффициент эмпатии (0.0 - 1.0)
-- **Rhythm Detector**: детектор ритма 0.038 Гц (~26.3 секунды период)
+### Runtime / Engine (`src/engine.rs`)
 
-#### 6. ECS System (`src/ecs.rs`)
+- `EventLoop` из winit, `EngineState` хранит renderer, simulation, камеру и телеметрию.
+- Каждую секунду пишет в лог аггрегированные показатели (кол-во вокселей, средняя энергия, настроение, эмпатия и действия VOXELCRAI).
+- Обработка ошибок surface: Lost → recreate, OutOfMemory → завершение, Timeout/Outdated → пропуск кадра.
 
-Использует bevy_ecs для управления сущностями:
+### Supporting Systems
 
-- Компоненты: Voxel
-- Системы: update_voxel_physics, update_voxel_energy
+- **Lighting** (`src/lighting.rs`): `LightPattern` на 1000 байт (SH + материалы); `LightingSystem` анимирует прямой свет синусом.
+- **ArchGuard** (`src/archguard.rs`): circuit-breaker, счётчики prometheus, эмпатия через async RwLock, детектор ритма 0.038 Гц.
+- **Diagnostic Binary** (`src/test_components.rs`): проверяет все подсистемы без GPU.
 
-#### 7. UI System (`src/ui.rs`)
+### Build & Targets
 
-egui + eframe интерфейс:
+- Rust 2021, release профиль: `opt-level=3`, `lto=true`, `codegen-units=1`, `panic="abort"`.
+- Кросс-компиляция на AArch64 поддерживается (arm/boot.s и linker.ld), но основной путь — десктопный wgpu.
 
-- Статистика вокселей и точек
-- Управление травма-режимом
-- Контроль эволюции
-- Управление освещением
-- Визуализация point cloud (упрощённая 2D проекция)
-- Debug информация
+### Performance Notes
 
-### Build System
+1. **Инстансинг**: все воксели рендерятся в одном draw-call через `InstanceRaw`.
+2. **Память**: воксели хранятся в векторе, пригодны для SIMD обработки.
+3. **Сложность**: обновление мира — O(n), пересчёт метрик — O(n); эволюция выполняется значительно реже (каждые 2 секунды).
+4. **Ввод**: события winit без доп. UI библиотек обеспечивают низкую задержку.
 
-#### Release Configuration
+### Roadmap
 
-```toml
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true
-```
-
-Целевой размер исполняемого файла: 50-100 МБ
-
-#### Bare-metal AArch64
-
-- Boot code: `arm/boot.s`
-- Linker script: `arm/linker.ld`
-- Entry point: 0x40000000
-
-### Performance Considerations
-
-1. **Voxel Storage**: Использование ECS для эффективного управления миллионами вокселей
-2. **Point Cloud Rendering**: Оптимизированный буфер для 1-1.5 миллиардов точек
-3. **Evolution**: Параллельная обработка популяции
-4. **Lighting**: Предвычисленные паттерны освещения
-
-### Trauma Mode
-
-Травма-режим увеличивает интенсивность:
-
-- Энергия: ×1.5
-- Эмоциональное возбуждение: ×1.3
-
-### Dependencies
-
-- **wgpu**: Vulkan/OpenGL рендеринг
-- **bevy_ecs**: ECS система
-- **eframe/egui**: UI
-- **prometheus**: Метрики
-- **half**: FP16 поддержка
-- **serde**: Сериализация
-
-### Platform Support
-
-- Windows (x86_64)
-- Linux (x86_64, AArch64)
-- Bare-metal AArch64
-
-### Future Enhancements
-
-- Полная интеграция HIP/ROCm для AMD Vega 20
-- Расширенная визуализация point cloud
-- Оптимизация памяти для больших популяций
-- Распределённая эволюция
+- Добавить streaming-чunks и загрузку данных с диска.
+- Визуализировать действия сознания на экране (HUD).
+- Реализовать HIP/ROCm fallback для конкретных AMD GPU.
+- Расширить фитнес-функцию (поддержка сложных материалов и освещения).

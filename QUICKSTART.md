@@ -1,88 +1,78 @@
 # Quick Start Guide
 
-## Adaptive Entity Engine v1.0
+## VOXELCRAI
 
 ### Prerequisites
 
-- Rust 1.70+ (install from https://rustup.rs/)
-- Vulkan drivers (for rendering)
-- Cargo (comes with Rust)
+- Rust 1.75+ (`rustup` is recommended)
+- GPU драйвер с поддержкой Vulkan/Metal/DX12/GL
+- Linux/macOS/Windows с рабочим графическим стеком
 
 ### Building
 
-#### Standard Build (Windows/Linux)
-
 ```bash
-# Debug build
+# Debug
 cargo build
 
-# Release build (optimized, 50-100 MB target)
+# Release
 cargo build --release
 
-# Or use the build script
+# Сценарий
 ./scripts/build-release.sh
 ```
 
-#### Bare-metal AArch64 Build
+#### Bare-metal Demo (optional)
 
 ```bash
-# Install target
 rustup target add aarch64-unknown-none
-
-# Build
 cargo build --target aarch64-unknown-none --release
 ```
 
 ### Running
 
 ```bash
-# Run release version
 cargo run --release
-
-# Or directly
-./target/release/adaptive-entity-engine
+# или
+./target/release/voxelcrai
 ```
 
-### Features
+Диагностический стенд без GPU:
 
-#### Trauma Mode
-Toggle trauma mode in the UI to increase energy and emotional intensity:
-- Energy: ×1.5
-- Emotional arousal: ×1.3
+```bash
+cargo run --bin voxelcrai-components
+```
 
-#### Evolution
-Click "Evolve Population" to run the NextGen Evolution algorithm on voxels.
+### Controls
 
-#### Lighting
-Add light patterns using the "Add Light Pattern" button. Each pattern is exactly 1000 bytes.
+- `W/A/S/D` — движение камеры
+- `Space` / `Shift` — вверх / вниз
+- `ПКМ + мышь` — вращение
+- Колесо — ускорение вдоль взгляда
+- `Esc` — выход
 
-#### Point Cloud
-The engine supports rendering up to 1.5 billion points, colored by energy (yellow = maximum).
+### Key Systems
 
-### Architecture
-
-- **Voxels**: 9-13 KB each with FP64/FP16/INT8/INT4, genome, echo, resonance
-- **Lighting**: LightPattern structure (exactly 1000 bytes)
-- **Rendering**: wgpu (Vulkan) with HIP/ROCm fallback for AMD Vega 20
-- **Protection**: ArchGuard Enterprise (circuit-breaker, prometheus, empathy_ratio, 0.038 Hz rhythm detector)
-- **UI**: egui + eframe
+- **ConsciousnessCore**: каждые ~0.6–1.2 s принимает решения (ignite, calm, trauma toggle, seed concept).
+- **Simulation**: обновляет `VoxelWorld`, запускает эволюцию раз в 2 s, синхронизирует lighting и ArchGuard.
+- **Renderer**: instanced wgpu пайплайн (`InstanceRaw` → `voxel.wgsl`), глубина `Depth32Float`.
+- **ArchGuard**: circuit breaker, Prometheus метрики, эмпатия сознания.
+- **LightPattern**: 1000-байтные шаблоны освещения, анимируются синусом.
 
 ### Troubleshooting
 
-#### Vulkan Not Found
-Install Vulkan drivers for your platform:
-- Windows: Install latest GPU drivers
-- Linux: Install `vulkan-loader` and GPU-specific drivers
+- **`SurfaceError::Lost` или пустое окно**: обновите GPU драйверы / проверьте поддержку Vulkan/Metal/DX12.
+- **`Validation Error`**: убедитесь, что установлены последнии версии `libvulkan` / `vulkan-sdk`.
+- **`OutOfMemory`**: уменьшите разрешение окна или ограничьте количество вокселей в `VoxelWorldConfig`.
 
-#### Build Errors
-Ensure you have the latest Rust toolchain:
+Обновление toolchain:
+
 ```bash
 rustup update
 ```
 
 ### Documentation
 
-- `README.md`: Main documentation
-- `ARCHITECTURE.md`: Detailed architecture
-- `PROJECT_STRUCTURE.md`: Project structure overview
-- `CHANGELOG.md`: Version history
+- `README.md` — обзор и управление.
+- `ARCHITECTURE.md` — подробности подсистем.
+- `PROJECT_STRUCTURE.md` — карта файлов.
+- `CHANGELOG.md` — история изменений.
