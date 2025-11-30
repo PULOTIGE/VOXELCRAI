@@ -6,20 +6,30 @@ authors = ["Adaptive Entity Engine Team"]
 description = "High-performance voxel engine with ECS, Vulkan rendering, and adaptive evolution"
 license = "MIT OR Apache-2.0"
 
+[features]
+default = ["gui", "all-integrations"]
+gui = ["eframe", "egui", "rfd", "chrono", "include_dir", "wgpu", "winit", "bytemuck", "pollster"]
+all-integrations = ["reqwest"]
+
 [profile.release]
-opt-level = 3
-lto = true
+opt-level = "z"  # Оптимизация размера
+lto = "fat"      # Полная LTO для максимальной оптимизации
 codegen-units = 1
 panic = "abort"
 strip = true
+debug = false
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+strip = false
 
 [dependencies]
 # Graphics & Rendering (optional for GUI)
-# wgpu = "0.19"
-# bytemuck = "1.14"
-# raw-window-handle = "0.5"
-# winit = "0.28"
-# pollster = "0.3"
+wgpu = { version = "0.19", optional = true }
+winit = { version = "0.28", optional = true }
+bytemuck = { version = "1.14", optional = true }
+pollster = "0.3"
 env_logger = "0.11"
 
 # ECS
@@ -27,9 +37,14 @@ bevy_ecs = "0.13"
 bevy_utils = "0.13"
 
 # UI (optional for GUI)
-# eframe = { version = "0.24", default-features = false, features = ["default_fonts", "glow"] }
-# egui = "0.24"
-# egui-wgpu = "0.24"
+eframe = { version = "0.24", default-features = false, features = ["default_fonts", "glow", "persistence"], optional = true }
+egui = { version = "0.24", optional = true }
+rfd = { version = "0.12", optional = true }
+chrono = { version = "0.4", features = ["serde"], optional = true }
+include_dir = { version = "0.7", optional = true }
+
+# HTTP клиент для интеграций (опционально)
+reqwest = { version = "0.11", features = ["json", "rustls-tls"], optional = true }
 
 # Math & Utilities
 glam = "0.24"

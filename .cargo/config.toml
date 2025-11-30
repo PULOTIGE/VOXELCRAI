@@ -6,3 +6,10 @@ rustflags = [
     "-C", "link-arg=-Tarm/linker.ld",
     "-C", "link-arg=-nostartfiles",
 ]
+
+[target.x86_64-pc-windows-msvc]
+rustflags = [
+    "-C", "link-arg=/NOLOGO",
+    "-C", "link-arg=/SUBSYSTEM:WINDOWS",
+    "-C", "link-arg=/ENTRY:mainCRTStartup",
+]

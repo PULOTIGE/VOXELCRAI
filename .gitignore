@@ -1,7 +1,8 @@
 target/
 Cargo.lock
 *.pdb
-*.exe
+# Исключаем EXE из игнора для dist/ директории
+!dist/**/*.exe
 *.dll
 *.so
 *.dylib
@@ -11,3 +12,6 @@ Cargo.lock
 *.swo
 *~
 .DS_Store
+# Временные файлы сборки
+dist/**/*.tmp
+dist/**/*.log

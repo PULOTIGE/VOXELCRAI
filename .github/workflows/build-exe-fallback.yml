@@ -1,0 +1,59 @@
+name: Build Mega EXE (Fallback)
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: 'Force rebuild (ignore cache)'
+        required: false
+        default: 'false'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-pc-windows-msvc
+    
+    - name: Build Mega EXE (without integrations first)
+      shell: pwsh
+      env:
+        RUSTFLAGS: -C target-feature=+crt-static
+      run: |
+        Write-Host "Building with features: gui (without integrations)"
+        cargo build --release --target x86_64-pc-windows-msvc --no-default-features --features "gui" --bin adaptive-entity-engine
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "Build failed!"
+          exit 1
+        }
+    
+    - name: Create dist directory
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path dist\windows | Out-Null
+    
+    - name: Copy EXE
+      shell: pwsh
+      run: |
+        if (Test-Path "target\x86_64-pc-windows-msvc\release\adaptive-entity-engine.exe") {
+          Copy-Item target\x86_64-pc-windows-msvc\release\adaptive-entity-engine.exe dist\windows\ -Force
+          Write-Host "EXE copied successfully"
+        } else {
+          Write-Error "EXE file not found!"
+          exit 1
+        }
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: adaptive-entity-engine-exe
+        path: dist/windows/adaptive-entity-engine.exe
+        retention-days: 30
