@@ -1,0 +1,33 @@
+# CrimeaAI Ecosystem Dependencies
+# Core
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Async & Scheduling
+asyncio-throttle>=1.0.0
+
+# Web scraping for concept search
+requests>=2.28.0
+beautifulsoup4>=4.11.0
+lxml>=4.9.0
+
+# UI & Visualization
+pygame>=2.5.0
+pygame-gui>=0.6.0
+
+# Machine Learning (optional)
+torch>=2.0.0
+
+# Serialization
+msgpack>=1.0.0
+cloudpickle>=2.2.0
+
+# System utilities
+psutil>=5.9.0
+colorama>=0.4.6
+
+# Build to EXE
+pyinstaller>=5.13.0
+
+# Additional
+tqdm>=4.65.0
