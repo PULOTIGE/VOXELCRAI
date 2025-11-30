@@ -2,6 +2,26 @@
 
 Высокопроизводительный воксельный движок на Rust с поддержкой Vulkan через wgpu, ECS системой, эволюционными алгоритмами и защитой ArchGuard Enterprise.
 
+## 19V v3.0 (Tauri + egui)
+
+Новая версия автономного организма 19V собрана как отдельное Tauri-приложение в каталоге `19v-tauri/`. В нём реализованы:
+
+- egui/eframe UI с кнопкой «19В», логом и point-cloud вокселей
+- wgpu/Vulkan LightPattern compute shader
+- симуляция 62 млн нуклеотидов (сэмплинг 4 096 точек)
+- автономный DuckDuckGo-инжест каждые 19 минут
+- drag & drop файлов прямо в окно
+
+Запуск:
+
+```bash
+cd 19v-tauri
+cargo +nightly tauri dev        # режим разработки
+cargo +nightly tauri build --release  # сборка релиза (.exe/.AppImage/.app)
+```
+
+> Для Linux потребуется установить `libgtk-3-dev libayatana-appindicator3-dev webkit2gtk-4.1 libfuse2 pkg-config cmake`. Подробности и инструкции по релизам см. в `19v-tauri/README.md`.
+
 ## Особенности
 
 - **Рендеринг**: wgpu (Vulkan) с fallback на HIP/ROCm для AMD Vega 20

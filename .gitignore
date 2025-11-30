@@ -1,5 +1,6 @@
 target/
 Cargo.lock
+!/19v-tauri/src-tauri/Cargo.lock
 *.pdb
 *.exe
 *.dll
